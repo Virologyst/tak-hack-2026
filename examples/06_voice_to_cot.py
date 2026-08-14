@@ -133,6 +133,9 @@ def main() -> None:
                     help="listen on the microphone and send a CoT per utterance")
     ap.add_argument("--device", type=int, help="input device index (see --devices)")
     ap.add_argument("--devices", action="store_true", help="list input devices")
+    ap.add_argument("--meter", action="store_true",
+                    help="show a live input level bar - run this when the mic "
+                         "seems deaf, before touching --threshold")
     ap.add_argument("--threshold", type=float,
                     help="VAD threshold; default is calibrated from the room")
     ap.add_argument("--url", help="where to SEND (default: the mesh SA group)")
@@ -159,6 +162,31 @@ def main() -> None:
         print("audio: %s" % reason)
         if ok:
             MicCapture.list_devices()
+        return
+
+    if args.meter:
+        from taklib.voice.mic import MicCapture
+        with MicCapture(device=args.device) as mic:
+            if args.threshold:
+                mic.threshold = args.threshold
+            peak = mic.meter()
+        print("peak rms: %.5f" % peak)
+        if peak < 0.0005:
+            print("\nThat is silence - audio is not reaching Python at all.")
+            print("Tuning --threshold will not help. Check, in order:")
+            print("  1. Settings > Privacy & security > Microphone")
+            print("     - 'Microphone access' on")
+            print("     - 'Let desktop apps access your microphone' on")
+            print("  2. Settings > System > Sound > Input - pick the array,")
+            print("     and check its input Volume is not at 0")
+            print("  3. Try another device index from --devices")
+        elif peak < 0.01:
+            print("\nVery quiet. Raise the input volume, move closer, or run")
+            print("with --threshold %.4f" % max(0.002, peak * 0.5))
+        else:
+            print("\nHealthy. Speech peaks here are normally 0.02-0.20.")
+            print("Use --threshold %.4f if calibration misjudges the room."
+                  % max(0.005, peak * 0.25))
         return
 
     # --- rules only, no audio, no network -----------------------------------

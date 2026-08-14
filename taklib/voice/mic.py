@@ -151,6 +151,45 @@ class MicCapture:
         self.threshold = max(floor, ambient * multiplier)
         return self.threshold
 
+    def meter(self, seconds: float = 20.0) -> float:
+        """Print a live input-level bar. Returns the peak RMS seen.
+
+        Run this first whenever "it isn't hearing me". A flat zero means the
+        audio never reaches Python, and no amount of threshold tuning will
+        help - the usual culprits on Windows are the per-app slider in
+        Settings > System > Sound > Volume mixer, or microphone access being
+        denied under Settings > Privacy & security > Microphone.
+        """
+        import numpy as np
+
+        if self._stream is None:
+            self.open()
+        while not self._q.empty():
+            self._q.get_nowait()
+
+        peak = 0.0
+        deadline = time.time() + seconds
+        print("speak now - Ctrl-C to stop early")
+        print("  level                                     rms      state")
+        try:
+            while time.time() < deadline:
+                try:
+                    block = self._q.get(timeout=0.5)
+                except queue.Empty:
+                    continue
+                rms = float(np.sqrt(np.mean(np.square(block))))
+                peak = max(peak, rms)
+                # Log-ish scale: speech sits around 0.02-0.2, so linear bars
+                # are useless at the bottom where the interesting part is.
+                filled = min(40, int((rms ** 0.5) * 90))
+                state = "SPEECH" if rms >= self.threshold else ""
+                print("  [%-40s] %.5f  %s" % ("#" * filled, rms, state),
+                      end="\r", flush=True)
+        except KeyboardInterrupt:
+            pass
+        print()
+        return peak
+
     def utterances(self) -> Iterator[AudioClip]:
         """Yield one clip per detected utterance. Runs until interrupted."""
         import numpy as np
