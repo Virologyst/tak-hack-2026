@@ -67,6 +67,58 @@ def show_report(report):
           % (report.get("source", "?"), report.get("confidence", 0.0)))
 
 
+def run_mic(args, llm) -> None:
+    """Listen until Ctrl-C, sending one CoT event per utterance."""
+    from taklib.voice.mic import MicCapture
+
+    ok, reason = MicCapture.available()
+    if not ok:
+        raise SystemExit("microphone unavailable: %s" % reason)
+
+    stt = get_transcriber(args.backend, keyterms=DEFAULT_KEYTERMS)
+    print("backend: %s - loading model ..." % stt.name)
+    stt.load()
+
+    sa_url = resolve_url(args.url) if args.url else SA_URL
+    sa = None if args.dry_run else TAKSender(sa_url)
+    chat = None if args.dry_run else TAKSender(args.chat_url)
+
+    with MicCapture(device=args.device) as mic:
+        if args.threshold:
+            mic.threshold = args.threshold
+            print("VAD threshold: %.4f (fixed)" % mic.threshold)
+        else:
+            print("calibrating - stay quiet for a moment ...")
+            print("VAD threshold: %.4f (from room noise)" % mic.calibrate())
+
+        if args.dry_run:
+            print("\ndry run - nothing will be sent")
+        else:
+            print("\nSA   -> %s" % sa_url)
+            print("chat -> %s" % args.chat_url)
+        print("listening. Ctrl-C to stop.\n")
+
+        for clip in mic.utterances():
+            report = understand(clip.samples, clip.sample_rate, stt, llm)
+            if not report.get("text"):
+                continue                     # VAD fired on something wordless
+            print("[%.1fs] %s" % (clip.duration, report["text"]))
+            print("        %s / %s / %s  conf %.2f"
+                  % (report["intent"], report["agency"],
+                     report.get("unit") or "-", report.get("confidence", 0.0)))
+
+            event = to_cot(report, args.lat, args.lon, uid_prefix=UID_PREFIX)
+            if sa is not None:
+                sa.send(event)
+                chat.send(cot.geochat(
+                    "%s: %s" % (report.get("unit") or "UNKNOWN", report["text"]),
+                    sender_uid="%s-bot" % UID_PREFIX,
+                    sender_callsign=BOT_CALLSIGN))
+                print("        sent %d bytes\n" % len(event))
+            else:
+                print("        would send %d bytes\n" % len(event))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -77,6 +129,12 @@ def main() -> None:
                     help="run the rules over canned sentences - no mic, no network")
     ap.add_argument("--say", help="interpret this text directly, skipping speech")
     ap.add_argument("--wav", help="transcribe and interpret a 16-bit PCM wav")
+    ap.add_argument("--mic", action="store_true",
+                    help="listen on the microphone and send a CoT per utterance")
+    ap.add_argument("--device", type=int, help="input device index (see --devices)")
+    ap.add_argument("--devices", action="store_true", help="list input devices")
+    ap.add_argument("--threshold", type=float,
+                    help="VAD threshold; default is calibrated from the room")
     ap.add_argument("--url", help="where to SEND (default: the mesh SA group)")
     ap.add_argument("--chat-url", default=CHAT_URL,
                     help="GeoChat multicast group (default: %s)" % CHAT_URL)
@@ -93,6 +151,14 @@ def main() -> None:
         print("speech backends:")
         for name, ok, reason in available_backends():
             print("  %-10s %-5s %s" % (name, "OK" if ok else "-", reason))
+        return
+
+    if args.devices:
+        from taklib.voice.mic import MicCapture
+        ok, reason = MicCapture.available()
+        print("audio: %s" % reason)
+        if ok:
+            MicCapture.list_devices()
         return
 
     # --- rules only, no audio, no network -----------------------------------
@@ -115,6 +181,11 @@ def main() -> None:
         if not llm.available():
             print("warning: no Ollama on 127.0.0.1:11434 - continuing with rules")
             llm = None
+
+    # --- live microphone: run until Ctrl-C ----------------------------------
+    if args.mic:
+        run_mic(args, llm)
+        return
 
     # --- get a report -------------------------------------------------------
     if args.say:
