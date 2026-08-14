@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from typing import Optional, Sequence, Tuple
 
-from .base import SAMPLE_RATE, Transcriber
+from .base import SAMPLE_RATE, Transcriber, clean_text
 
 
 class MoonshineTranscriber(Transcriber):
@@ -73,4 +73,4 @@ class MoonshineTranscriber(Transcriber):
             list(samples), sample_rate
         )
         lines = getattr(transcript, "lines", None) or []
-        return " ".join(ln.text.strip() for ln in lines if ln.text).strip()
+        return clean_text(" ".join(ln.text for ln in lines if ln.text))

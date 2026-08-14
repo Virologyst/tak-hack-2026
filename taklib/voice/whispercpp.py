@@ -22,7 +22,7 @@ import os
 import shutil
 from typing import Optional, Sequence, Tuple
 
-from .base import SAMPLE_RATE, Transcriber, write_wav
+from .base import SAMPLE_RATE, Transcriber, clean_text, write_wav
 
 
 class WhisperTranscriber(Transcriber):
@@ -104,15 +104,15 @@ class WhisperTranscriber(Transcriber):
                 audio, language="en", vad_filter=True,
                 initial_prompt=", ".join(self.keyterms) if self.keyterms else None,
             )
-            return " ".join(s.text.strip() for s in segments).strip()
+            return clean_text(" ".join(s.text for s in segments))
 
         if self._route == "pywhispercpp":
             import numpy as np
             audio = np.asarray(list(samples), dtype=np.float32)
             segments = self._impl.transcribe(audio)
-            return " ".join(s.text.strip() for s in segments).strip()
+            return clean_text(" ".join(s.text for s in segments))
 
-        return self._transcribe_via_cli(samples, sample_rate)
+        return clean_text(self._transcribe_via_cli(samples, sample_rate))
 
     def _transcribe_via_cli(self, samples: Sequence[float],
                             sample_rate: int) -> str:

@@ -105,6 +105,28 @@ class Transcriber:
         return "<%s loaded=%s>" % (type(self).__name__, self._loaded)
 
 
+def clean_text(text: str) -> str:
+    """Flatten a transcript to one printable ASCII-safe line.
+
+    Recognisers emit newlines, carriage returns and the odd control byte.
+    A stray \\r overwrites the line you just printed, so output looks
+    truncated mid-word and the run appears broken when it is fine. Windows
+    consoles are cp1252 too, so non-encodable characters are dropped rather
+    than allowed to raise mid-demo.
+    """
+    if not text:
+        return ""
+    flat = "".join(
+        (ch if (ch.isprintable() or ch == " ") else " ") for ch in text
+    )
+    flat = " ".join(flat.split())            # collapse runs of whitespace
+    try:
+        flat.encode("cp1252")
+    except UnicodeEncodeError:
+        flat = flat.encode("ascii", "replace").decode("ascii")
+    return flat.strip()
+
+
 # --- WAV in and out, stdlib only --------------------------------------------
 #
 # `wave` handles the container; we do the PCM conversion by hand rather than
