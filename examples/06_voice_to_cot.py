@@ -75,9 +75,13 @@ def run_mic(args, llm) -> None:
     if not ok:
         raise SystemExit("microphone unavailable: %s" % reason)
 
-    stt = get_transcriber(args.backend, keyterms=DEFAULT_KEYTERMS)
+    kw = {"keyterms": DEFAULT_KEYTERMS}
+    if args.model:
+        kw["model_arch"] = args.model
+    stt = get_transcriber(args.backend, **kw)
     print("backend: %s - loading model ..." % stt.name)
     stt.load()
+    print("model:   %s" % getattr(stt, "model_arch", "n/a"))
 
     sa_url = resolve_url(args.url) if args.url else SA_URL
     sa = None if args.dry_run else TAKSender(sa_url)
@@ -88,7 +92,8 @@ def run_mic(args, llm) -> None:
     from taklib.voice.mic import UtteranceStream
 
     with MicCapture(device=args.device, gain=args.gain,
-                    silence_seconds=args.silence) as mic:
+                    silence_seconds=args.silence,
+                    max_seconds=args.max_seconds) as mic:
         if args.gain != 1.0:
             print("mic gain: %.1fx" % args.gain)
         if args.threshold:
@@ -172,9 +177,18 @@ def main() -> None:
                     help="digital gain on the mic, for when the OS input level "
                          "is low and locked (managed laptop, cheap USB mic)")
     ap.add_argument("--silence", type=float, default=0.8,
-                    help="seconds of quiet that ends an utterance. Lower it "
-                         "for clipped radio traffic, raise it if one sentence "
-                         "keeps splitting in two (default: 0.8)")
+                    help="seconds of quiet that ends an utterance. THE lever "
+                         "for responsiveness - 0.4 suits clipped radio "
+                         "traffic; raise it if one sentence keeps splitting "
+                         "in two (default: 0.8)")
+    ap.add_argument("--max-seconds", type=float, default=15.0,
+                    help="hard cap on one utterance. Real radio traffic is "
+                         "2-4s; 8 is plenty and stops a rambler stalling the "
+                         "queue (default: 15)")
+    ap.add_argument("--model", help="moonshine size: TINY_STREAMING (default, "
+                                    "2.8x realtime) or MEDIUM_STREAMING "
+                                    "(0.9x, no better on our test clip). "
+                                    "Also settable via $TAK_STT_MODEL")
     ap.add_argument("--url", help="where to SEND (default: the mesh SA group)")
     ap.add_argument("--chat-url", default=CHAT_URL,
                     help="GeoChat multicast group (default: %s)" % CHAT_URL)
@@ -262,8 +276,13 @@ def main() -> None:
             if better:
                 report = _normalise(better)
     elif args.wav:
-        stt = get_transcriber(args.backend, keyterms=DEFAULT_KEYTERMS)
-        print("backend: %s" % stt.name)
+        kw = {"keyterms": DEFAULT_KEYTERMS}
+        if args.model:
+            kw["model_arch"] = args.model
+        stt = get_transcriber(args.backend, **kw)
+        stt.load()
+        print("backend: %s (%s)" % (stt.name,
+                                    getattr(stt, "model_arch", "n/a")))
         clip = load_wav(args.wav)
         print("audio  : %.2fs @ %dHz" % (clip.duration, clip.sample_rate))
         report = understand(clip.samples, clip.sample_rate, stt, llm)

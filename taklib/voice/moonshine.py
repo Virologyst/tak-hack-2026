@@ -29,10 +29,28 @@ class MoonshineTranscriber(Transcriber):
 
     name = "moonshine"
 
+    #: Measured on an Intel Core Ultra 7 255H with a 4.1s clip, 15 Aug 2026:
+    #:
+    #:   TINY_STREAMING    1.48s   2.8x realtime   5/6 key phrases
+    #:   MEDIUM_STREAMING  4.70s   0.9x realtime   5/6 key phrases
+    #:
+    #: Same accuracy, 3.2x the speed. MEDIUM is the library default and it is
+    #: *slower than realtime*, so under continuous chatter it can never catch
+    #: up. We default to TINY_STREAMING instead. Override per machine with
+    #: $TAK_STT_MODEL, e.g. MEDIUM_STREAMING if accuracy matters more than lag.
+    #:
+    #: Only the streaming architectures accept keyterms; TINY and BASE raise
+    #: MoonshineError, which is caught rather than allowed to kill a demo.
+    DEFAULT_ARCH = "TINY_STREAMING"
+
     def __init__(self, language: str = "en",
-                 keyterms: Optional[Sequence[str]] = None, **kwargs):
+                 keyterms: Optional[Sequence[str]] = None,
+                 model_arch: Optional[str] = None, **kwargs):
+        import os
         super().__init__(keyterms=keyterms, **kwargs)
         self.language = language
+        self.model_arch = (model_arch or os.environ.get("TAK_STT_MODEL")
+                           or self.DEFAULT_ARCH).strip().upper()
         self._tr = None
 
     def available(self) -> Tuple[bool, str]:
@@ -46,15 +64,36 @@ class MoonshineTranscriber(Transcriber):
         if self._loaded:
             return
         import moonshine_voice as mv
+        from moonshine_voice.moonshine_api import ModelArch
         from moonshine_voice.transcriber import Transcriber as MoonshineCore
 
+        wanted = getattr(ModelArch, self.model_arch, None)
+        if wanted is None:
+            raise ValueError(
+                "unknown TAK_STT_MODEL %r - expected one of %s"
+                % (self.model_arch, ", ".join(a.name for a in ModelArch))
+            )
+
         # Downloads on first run. Everything after is local.
-        path, arch = mv.get_model_for_language(self.language)
+        try:
+            path, arch = mv.get_model_for_language(self.language, wanted)
+        except ValueError:
+            # Not every arch is published for every language - BASE_STREAMING
+            # has no English build, for instance. Fall back to the default
+            # rather than refuse to start.
+            path, arch = mv.get_model_for_language(self.language)
+        self.model_arch = arch.name
         self._tr = MoonshineCore(path, arch)
+
         if self.keyterms:
             # Biases decoding toward domain words. Helps with callsigns; it is
             # not magic and will still occasionally mishear small words.
-            self._tr.set_keyterms(list(self.keyterms))
+            # Only the streaming architectures support this - the others raise
+            # MoonshineError, and losing keyterms beats losing the process.
+            try:
+                self._tr.set_keyterms(list(self.keyterms))
+            except Exception:
+                self.keyterms = ()
         self._loaded = True
 
     def close(self) -> None:
