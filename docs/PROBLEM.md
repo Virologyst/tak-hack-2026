@@ -155,3 +155,37 @@ so other clients ignore what they don't understand and nothing breaks.
 ## Notes and decisions
 
 _(Anything learned the hard way — put it here so nobody learns it twice.)_
+
+### Speech-to-text: use moonshine. Phi-4 was tested and rejected.
+
+`taklib.voice` supports three backends behind `$TAK_STT`. Only one earns its
+place right now.
+
+| Backend | Download | Result |
+|---|---|---|
+| **moonshine** | 15 MB + ~15 MB models | **Works.** ~1.5x realtime on the laptop CPU, clean transcriptions, spoken numbers arrive as digits ("gate four" → "Gate 4") |
+| phi-4-multimodal (int4 ONNX) | **5.1 GB** | Hears correctly, then degenerates. See below |
+| whisper | varies | Written as a fallback, never exercised |
+
+**Phi-4-multimodal, int4 ONNX, DirectML, RTX 4050 6 GB — tested 15 Aug.**
+The appeal was real: it reasons on the audio itself, so it should skip the
+lossy transcribe-then-parse step that turns "two patients" into "to patients".
+In practice the int4 quantization broke it. It transcribed the opening words
+correctly and then looped the same phrase forever; damping the loop produced
+fluent nonsense instead; asked for JSON it invented generic values from the
+prompt while ignoring the audio. Loading the speech LoRA adapter explicitly
+did not help. Full write-up in `taklib/voice/phi4.py`.
+
+Worth revisiting only with the fp16 build (~11 GB VRAM, so not this laptop).
+
+**Gotcha if anyone retries it:** the speech processor accepts 8 kHz or 16 kHz
+only. Feed it 24 kHz and it silently produces garbage rather than resampling.
+
+### Mic notes
+
+- This laptop's input gain is ~100x below normal and the OS control is locked
+  (managed device). Use `--gain 50`. `--meter` measures and suggests a value.
+- Capture and recognition run on separate threads, with a bounded queue that
+  drops the *oldest* clips under load — during a fast-moving incident the
+  newest transmission is the one that matters, and a silently growing lag is
+  worse than an acknowledged gap.

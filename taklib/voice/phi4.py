@@ -14,21 +14,59 @@ Cost of that: 5.6B parameters. Roughly 3 GB VRAM at 4-bit, ~11 GB at fp16, so a
 6 GB laptop GPU wants `load_in_4bit=True` (the default here). Not viable on a
 Raspberry Pi at all - run this on the laptop and let the Pi do capture.
 
-**Verify before you depend on it:** quantized runtimes support Phi-4's text and
-vision paths far better than the audio path. Run `python -m taklib.voice.phi4`
-to check that audio actually works on your install before building a demo on
-it. If the audio path is broken, fall back to moonshine plus the text
-interpreter - the pipeline handles that automatically.
+**TESTED AND NOT RECOMMENDED - 15 Aug 2026, RTX 4050 6 GB + DirectML.**
+
+We downloaded the official prebuilt int4 ONNX build (5.1 GB,
+`microsoft/Phi-4-multimodal-instruct-onnx`, `gpu-int4-rtn-block-32`) and ran
+it. Findings, so nobody repeats the evening:
+
+- The audio path *is* present and *does* work. Given a clean 16 kHz clip of
+  "Ambulance seven on scene at the main stage, two patients, requesting
+  backup", the model returned "Ambulance seven on scene" - correct.
+- It then collapsed into an infinite loop, repeating that phrase until the
+  token budget ran out. `repetition_penalty` and `no_repeat_ngram_size`
+  stopped the loop and replaced it with fluent nonsense.
+- Asked the same audio a second way, it hallucinated unrelated content
+  ("I just sent a message to my team ...").
+- Asked for JSON, it produced well-formed JSON with generic invented values,
+  identical whether or not the audio was correctly sampled - i.e. it was
+  answering from the prompt alone.
+- Loading the speech LoRA adapter explicitly (`Adapters.load` +
+  `set_active_adapter`) did not fix it.
+
+Conclusion: int4 RTN quantization damages this model too much for the audio
+path to be trustworthy. On the same clip, moonshine gave a clean, correct,
+complete transcription in ~2.4 s from a 15 MB download. **Use moonshine.**
+
+Worth retrying only if you have the VRAM for the fp16 transformers build
+(~11 GB, so not a 6 GB laptop GPU), or if a better-quantized release appears.
+The code below is the transformers route and remains untested.
+
+One trap if you do try: the speech processor accepts 8 kHz or 16 kHz only.
+Feed it 24 kHz and it silently produces garbage features rather than
+resampling or complaining.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from typing import Dict, Optional, Sequence, Tuple
 
-from .base import SAMPLE_RATE, Transcriber
+from .base import SAMPLE_RATE, Transcriber, clean_text
 
 MODEL_ID = "microsoft/Phi-4-multimodal-instruct"
+
+#: Prebuilt int4 ONNX weights - 5.1 GB, and the one to prefer on Windows.
+#: No torch, no bitsandbytes, and DirectML runs it on any DX12 GPU, so an
+#: RTX 4050 or an Arc iGPU both work. The build ships a dedicated speech
+#: encoder and adapter, so the audio path is genuinely present rather than
+#: text-and-vision-only as some quantized releases are. Download with:
+#:   huggingface-cli download microsoft/Phi-4-multimodal-instruct-onnx \
+#:       --include "gpu/*" --local-dir models/phi4-onnx
+ONNX_REPO = "microsoft/Phi-4-multimodal-instruct-onnx"
+DEFAULT_ONNX_PATH = os.path.join("models", "phi4-onnx", "gpu",
+                                 "gpu-int4-rtn-block-32")
 
 #: Asking for JSON and nothing else. Small models pad answers with prose, so we
 #: still defensively hunt for the first {...} block in the reply.
@@ -143,10 +181,10 @@ class Phi4Transcriber(Transcriber):
     def transcribe(self, samples: Sequence[float],
                    sample_rate: int = SAMPLE_RATE) -> str:
         self.load()
-        return self._generate(
+        return clean_text(self._generate(
             "Transcribe this audio exactly. Output only the transcription.",
             samples, sample_rate, max_new_tokens=256,
-        )
+        ))
 
     def interpret(self, samples: Sequence[float],
                   sample_rate: int = SAMPLE_RATE) -> Optional[Dict]:
