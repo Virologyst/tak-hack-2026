@@ -34,6 +34,17 @@ env/
 .DS_Store
 Thumbs.db
 
+# --- model weights ----------------------------------------------------------
+# Speech and LLM weights are gigabytes. Phi-4-multimodal int4 alone is 5.1 GB.
+# They are downloadable and machine-specific; never let one near a commit.
+models/
+*.onnx
+*.onnx.data
+*.onnx_adapter
+*.gguf
+*.safetensors
+*.bin
+
 # --- runtime output ---------------------------------------------------------
 # Recorded CoT sessions can get large. Commit one deliberately with `git add -f`
 # if it's the demo fallback you actually want to keep.

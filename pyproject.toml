@@ -19,6 +19,25 @@ extras = [
     "takproto>=3.0.0",   # decode TAK Protocol v1 (protobuf) servers
 ]
 
+# Speech input. taklib.voice imports these lazily, so none of it is needed
+# unless you actually call a backend - `import taklib` stays dependency-free.
+# pip install -e ".[voice]"
+voice = [
+    "moonshine-voice>=0.1.2",   # fastest, best for short radio traffic
+]
+# The whisper fallback, if you'd rather have output you can compare against
+# something familiar: pip install -e ".[voice-whisper]"
+voice-whisper = [
+    "faster-whisper>=1.0.0",
+]
+# Phi-4-multimodal: audio -> JSON in one model. ~3 GB VRAM at 4-bit.
+# Install torch from pytorch.org first to get the right CUDA build.
+voice-phi4 = [
+    "transformers>=4.48",
+    "accelerate>=1.0",
+    "bitsandbytes>=0.45",
+]
+
 [project.scripts]
 tak = "tak:main"
 
