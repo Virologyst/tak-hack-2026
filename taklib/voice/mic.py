@@ -50,9 +50,23 @@ class MicCapture:
                  silence_seconds: float = 0.8,
                  min_speech: float = 0.35,
                  max_seconds: float = 15.0,
-                 pre_roll: float = 0.25):
+                 pre_roll: float = 0.25,
+                 gain: float = 1.0,
+                 normalise: bool = True,
+                 target_rms: float = 0.06):
         self.device = device
         self.sample_rate = int(sample_rate)
+        # Digital gain, applied before the VAD sees anything. Needed when the
+        # OS input level is low and you cannot raise it - a managed laptop, or
+        # a Pi with a cheap USB mic. It amplifies noise too, so prefer fixing
+        # the input level when you actually can.
+        self.gain = float(gain)
+        # Scale each finished utterance to a sane level before it reaches the
+        # recogniser. Independent of `gain`: that one exists to make the VAD
+        # trigger, this one exists because ASR models are trained on audio at
+        # normal loudness and quietly lose accuracy on very quiet input.
+        self.normalise = bool(normalise)
+        self.target_rms = float(target_rms)
         self.threshold = float(threshold)
         self.silence_seconds = float(silence_seconds)
         self.min_speech = float(min_speech)
@@ -98,7 +112,10 @@ class MicCapture:
             if status:                       # overflows are normal under load
                 pass
             # Copy: sounddevice reuses the buffer under us.
-            self._q.put(indata[:, 0].copy())
+            block = indata[:, 0].copy()
+            if self.gain != 1.0:
+                block = block * self.gain
+            self._q.put(block)
 
         self._stream = sd.InputStream(
             samplerate=self.sample_rate, channels=1, dtype="float32",
@@ -124,8 +141,36 @@ class MicCapture:
 
     # -- the VAD ------------------------------------------------------------
 
+    def suggest_gain(self, seconds: float = 3.0,
+                     target_peak: float = 0.08) -> float:
+        """Measure the room and return the gain that would make speech usable.
+
+        Speak *while this runs* - it works off the loudest thing it hears, so
+        measuring silence tells it nothing. Apply the result as `gain`, or pass
+        --gain on the example.
+        """
+        import numpy as np
+
+        if self._stream is None:
+            self.open()
+        while not self._q.empty():
+            self._q.get_nowait()
+
+        peak = 0.0
+        deadline = time.time() + seconds
+        while time.time() < deadline:
+            try:
+                block = self._q.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            peak = max(peak, float(np.max(np.abs(block))))
+
+        if peak < 1e-6:                      # nothing at all; gain can't help
+            return 1.0
+        return round(min(200.0, target_peak / peak), 1)
+
     def calibrate(self, seconds: float = 1.5, multiplier: float = 3.0,
-                  floor: float = 0.008) -> float:
+                  floor: float = 0.0015) -> float:
         """Measure the room and set `threshold` from it. Returns the threshold.
 
         `multiplier` is how far above ambient a voice has to be. 3x is a decent
@@ -236,6 +281,18 @@ class MicCapture:
             samples = np.concatenate(buffer) if buffer else np.zeros(0)
             buffer = []
             duration = len(samples) / float(self.sample_rate)
-            if duration >= self.min_speech:
-                yield AudioClip(samples.tolist(), self.sample_rate)
-            # else: a cough, a chair, a door. Dropped without comment.
+            if duration < self.min_speech:
+                continue      # a cough, a chair, a door. Dropped in silence.
+
+            if self.normalise and len(samples):
+                # Bring the clip up to a level the recogniser expects. ASR
+                # models are trained on normally-loud speech and lose accuracy
+                # on very quiet input, so this matters even when the VAD was
+                # perfectly happy. Cap the boost so a near-silent clip does not
+                # get amplified into pure noise.
+                rms = float(np.sqrt(np.mean(np.square(samples))))
+                if rms > 1e-6:
+                    scale = min(50.0, self.target_rms / rms)
+                    samples = np.clip(samples * scale, -1.0, 1.0)
+
+            yield AudioClip(samples.tolist(), self.sample_rate)

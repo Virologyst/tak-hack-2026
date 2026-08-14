@@ -83,7 +83,9 @@ def run_mic(args, llm) -> None:
     sa = None if args.dry_run else TAKSender(sa_url)
     chat = None if args.dry_run else TAKSender(args.chat_url)
 
-    with MicCapture(device=args.device) as mic:
+    with MicCapture(device=args.device, gain=args.gain) as mic:
+        if args.gain != 1.0:
+            print("mic gain: %.1fx" % args.gain)
         if args.threshold:
             mic.threshold = args.threshold
             print("VAD threshold: %.4f (fixed)" % mic.threshold)
@@ -138,6 +140,9 @@ def main() -> None:
                          "seems deaf, before touching --threshold")
     ap.add_argument("--threshold", type=float,
                     help="VAD threshold; default is calibrated from the room")
+    ap.add_argument("--gain", type=float, default=1.0,
+                    help="digital gain on the mic, for when the OS input level "
+                         "is low and locked (managed laptop, cheap USB mic)")
     ap.add_argument("--url", help="where to SEND (default: the mesh SA group)")
     ap.add_argument("--chat-url", default=CHAT_URL,
                     help="GeoChat multicast group (default: %s)" % CHAT_URL)
@@ -166,26 +171,27 @@ def main() -> None:
 
     if args.meter:
         from taklib.voice.mic import MicCapture
-        with MicCapture(device=args.device) as mic:
+        with MicCapture(device=args.device, gain=args.gain) as mic:
             if args.threshold:
                 mic.threshold = args.threshold
             peak = mic.meter()
-        print("peak rms: %.5f" % peak)
+        print("peak rms: %.5f  (gain %.1fx)" % (peak, args.gain))
         if peak < 0.0005:
             print("\nThat is silence - audio is not reaching Python at all.")
-            print("Tuning --threshold will not help. Check, in order:")
+            print("Gain will not help; it multiplies zero. Check:")
             print("  1. Settings > Privacy & security > Microphone")
             print("     - 'Microphone access' on")
             print("     - 'Let desktop apps access your microphone' on")
-            print("  2. Settings > System > Sound > Input - pick the array,")
-            print("     and check its input Volume is not at 0")
-            print("  3. Try another device index from --devices")
-        elif peak < 0.01:
-            print("\nVery quiet. Raise the input volume, move closer, or run")
-            print("with --threshold %.4f" % max(0.002, peak * 0.5))
+            print("  2. Try another device index from --devices")
+        elif peak < 0.02:
+            suggested = round(min(200.0, 0.08 / max(peak, 1e-6)), 1)
+            print("\nToo quiet for reliable detection.")
+            print("If you cannot raise the OS input level, amplify here:")
+            print("  --gain %.1f --threshold %.4f"
+                  % (suggested, max(0.002, peak * suggested * 0.25)))
         else:
             print("\nHealthy. Speech peaks here are normally 0.02-0.20.")
-            print("Use --threshold %.4f if calibration misjudges the room."
+            print("Auto-calibration should cope; pin --threshold %.4f if not."
                   % max(0.005, peak * 0.25))
         return
 
