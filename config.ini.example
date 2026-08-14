@@ -1,16 +1,47 @@
+; Copy to config.ini and edit. config.ini is gitignored, so every machine can
+; point somewhere different without fighting over the file.
+;
+; Precedence: --url flag  >  $COT_URL env var  >  this file  >  built-in default.
+; On event day the quickest thing is usually just:
+;     set COT_URL=udp://THEIR_IP:6969      (Windows)
+;     export COT_URL=udp://THEIR_IP:6969   (bash)
+
 [bridge]
-# --- Plain TCP (simplest; use this first) ---
-COT_URL = tcp://127.0.0.1:8087
-# On event day, swap 127.0.0.1 for THE SERVER IP they give you:
-# COT_URL = tcp://10.0.0.42:8087
 
-# --- TLS with client cert (production TAK Server, port 8089) ---
-# COT_URL = tls://SERVER_IP:8089
-# PYTAK_TLS_CLIENT_CERT = ./certs/client.pem
-# PYTAK_TLS_CLIENT_KEY  = ./certs/client.key
-# PYTAK_TLS_CLIENT_PASSWORD = changeit
-# PYTAK_TLS_DONT_VERIFY = 1        # only for quick testing with self-signed certs
+; --- UDP out to the venue's server: THE PATH WE'RE USING -------------------
+; Fire-and-forget. No handshake, no certs, no connection to lose.
+; Swap in the IP and port they give you on the day.
+COT_URL = udp://239.2.3.1:6969
 
-# Tip: TAK data packages ship a .p12 bundle. Extract cert + key with:
-#   openssl pkcs12 -in truststore.p12 -out client.pem -clcerts -nokeys
-#   openssl pkcs12 -in truststore.p12 -out client.key -nocerts -nodes
+; Unicast straight at their box, if that's what they hand you:
+; COT_URL = udp://10.0.0.42:6969
+;
+; 239.2.3.1:6969 is the standard TAK mesh SA multicast group. Anything on the
+; same LAN listening for mesh traffic — including ATAK phones in mesh mode —
+; picks it up with no server involved at all. Good fallback if their server
+; is down or you're testing between two laptops.
+;
+; Loopback, for testing on one machine with `python tak.py listen`:
+; COT_URL = udp://127.0.0.1:6969
+
+
+; --- TCP / TLS: only if they turn out to want a streaming connection -------
+; Kept here so the switch costs you ten seconds rather than an hour.
+; COT_URL = tcp://10.0.0.42:8087
+; COT_URL = tls://10.0.0.42:8089
+; PYTAK_TLS_CLIENT_CERT = ./certs/client.pem
+; PYTAK_TLS_CLIENT_KEY  = ./certs/client.key
+; PYTAK_TLS_CLIENT_PASSWORD = changeit
+; PYTAK_TLS_DONT_VERIFY = 1        ; self-signed certs only, say so in the demo
+;
+; TAK data packages ship a .p12 bundle; extract cert + key with:
+;   openssl pkcs12 -in truststore.p12 -out client.pem -clcerts -nokeys
+;   openssl pkcs12 -in truststore.p12 -out client.key -nocerts -nodes
+
+
+; --- who this machine is on the map ---------------------------------------
+; Set these per laptop. If two people share a UID their markers fight over
+; the same dot and you'll waste twenty minutes working out why.
+; TAK_CALLSIGN = BRIDGE-CRAIG
+; TAK_TEAM     = Cyan
+; TAK_UID      = taklib-craig

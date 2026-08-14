@@ -1,0 +1,41 @@
+# --- secrets and per-machine config -----------------------------------------
+# config.ini is per-machine: everyone points at a different URL. Only the
+# .example is tracked.
+config.ini
+config.local.ini
+
+# Certificates from TAK data packages. Never commit these.
+certs/
+*.p12
+*.pem
+*.key
+*.jks
+*.keystore
+*.zip
+
+# --- python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- IDE / OS ---------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- runtime output ---------------------------------------------------------
+# Recorded CoT sessions can get large. Commit one deliberately with `git add -f`
+# if it's the demo fallback you actually want to keep.
+*.cot
+*.log

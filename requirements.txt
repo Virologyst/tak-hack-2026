@@ -1,2 +1,16 @@
+# taklib itself needs NOTHING from this file.
+#
+# Everything in tak.py and taklib/ is pure standard library, on purpose: a
+# failed pip install on event morning must never be the reason we can't demo.
+#
+# These are optional conveniences. Install them if you have working internet:
+#     pip install -r requirements.txt
+
+# Alternative async CoT sender with a worker/queue model. Useful if you prefer
+# its structure, or if you're following a pytak tutorial verbatim.
 pytak>=6.0.0
+
+# Decodes TAK Protocol v1 (protobuf) frames — the ones starting with byte 0xBF.
+# Only needed for READING from a server that speaks protobuf instead of XML.
+# We always send XML, which every TAK server accepts.
 takproto>=3.0.0

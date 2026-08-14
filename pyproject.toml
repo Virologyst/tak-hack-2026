@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "taklib"
+version = "0.1.0"
+description = "Cursor-on-Target toolkit for the TAK hackathon — build, send, receive"
+requires-python = ">=3.10"
+# Deliberately empty: taklib is pure standard library, so a failed pip install
+# at the venue can never stop us demoing. See requirements.txt for the
+# optional extras.
+dependencies = []
+
+[project.optional-dependencies]
+# pip install -e ".[extras]"
+extras = [
+    "pytak>=6.0.0",      # alternative async sender, if you prefer its worker model
+    "takproto>=3.0.0",   # decode TAK Protocol v1 (protobuf) servers
+]
+
+[project.scripts]
+tak = "tak:main"
+
+[tool.setuptools]
+packages = ["taklib"]
+py-modules = ["tak"]
