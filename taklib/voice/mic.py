@@ -27,8 +27,9 @@ venue is at its normal noise level, not during a quiet moment.
 from __future__ import annotations
 
 import queue
+import threading
 import time
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Tuple
 
 from .base import SAMPLE_RATE, AudioClip
 
@@ -314,3 +315,74 @@ class MicCapture:
                     samples = np.clip(samples * scale, -1.0, 1.0)
 
             yield AudioClip(samples.tolist(), self.sample_rate)
+
+
+class UtteranceStream:
+    """Capture on one thread, recognise on another, and never fall behind.
+
+    Recognition takes seconds; speech does not wait. Run both on one thread
+    and every busy period pushes the map further behind reality - which at
+    demo time looks like the system ignoring you, not like it being slow.
+
+    So capture runs in a background thread feeding a *bounded* queue. When
+    recognition cannot keep up the oldest clips are dropped and counted,
+    because during a rapidly evolving incident the newest transmission is the
+    one that matters. A silently growing backlog is the worse failure - you
+    would be showing the judges a minute-old picture and not know it.
+
+    Iterating yields `(clip, stats)` where stats carries `dropped` and
+    `backlog` so the caller can say out loud when it is losing traffic.
+    """
+
+    def __init__(self, mic: "MicCapture", maxsize: int = 6):
+        self.mic = mic
+        self.queue: "queue.Queue" = queue.Queue(maxsize=maxsize)
+        self.dropped = 0
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+
+    def _pump(self) -> None:
+        try:
+            for clip in self.mic.utterances():
+                if self._stop.is_set():
+                    return
+                try:
+                    self.queue.put_nowait(clip)
+                except queue.Full:
+                    # Drop the oldest, keep the newest. Losing stale chatter
+                    # beats reporting it late.
+                    try:
+                        self.queue.get_nowait()
+                        self.dropped += 1
+                    except queue.Empty:
+                        pass
+                    try:
+                        self.queue.put_nowait(clip)
+                    except queue.Full:
+                        self.dropped += 1
+        except Exception:
+            # A dead capture thread must not wedge the consumer forever.
+            self._stop.set()
+
+    def start(self) -> "UtteranceStream":
+        self._thread = threading.Thread(target=self._pump, daemon=True)
+        self._thread.start()
+        return self
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def __enter__(self) -> "UtteranceStream":
+        return self.start()
+
+    def __exit__(self, *exc) -> None:
+        self.stop()
+
+    def __iter__(self) -> Iterator[Tuple[AudioClip, dict]]:
+        while not self._stop.is_set():
+            try:
+                clip = self.queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            yield clip, {"dropped": self.dropped,
+                         "backlog": self.queue.qsize()}

@@ -83,7 +83,12 @@ def run_mic(args, llm) -> None:
     sa = None if args.dry_run else TAKSender(sa_url)
     chat = None if args.dry_run else TAKSender(args.chat_url)
 
-    with MicCapture(device=args.device, gain=args.gain) as mic:
+    import time
+
+    from taklib.voice.mic import UtteranceStream
+
+    with MicCapture(device=args.device, gain=args.gain,
+                    silence_seconds=args.silence) as mic:
         if args.gain != 1.0:
             print("mic gain: %.1fx" % args.gain)
         if args.threshold:
@@ -100,25 +105,48 @@ def run_mic(args, llm) -> None:
             print("chat -> %s" % args.chat_url)
         print("listening. Ctrl-C to stop.\n")
 
-        for clip in mic.utterances():
-            report = understand(clip.samples, clip.sample_rate, stt, llm)
-            if not report.get("text"):
-                continue                     # VAD fired on something wordless
-            print("[%.1fs] %s" % (clip.duration, report["text"]))
-            print("        %s / %s / %s  conf %.2f"
-                  % (report["intent"], report["agency"],
-                     report.get("unit") or "-", report.get("confidence", 0.0)))
+        heard = 0
+        last_dropped = 0
+        with UtteranceStream(mic) as stream:
+            for clip, stats in stream:
+                t0 = time.time()
+                report = understand(clip.samples, clip.sample_rate, stt, llm)
+                asr = time.time() - t0
+                if not report.get("text"):
+                    continue                 # VAD fired on something wordless
 
-            event = to_cot(report, args.lat, args.lon, uid_prefix=UID_PREFIX)
-            if sa is not None:
-                sa.send(event)
-                chat.send(cot.geochat(
-                    "%s: %s" % (report.get("unit") or "UNKNOWN", report["text"]),
-                    sender_uid="%s-bot" % UID_PREFIX,
-                    sender_callsign=BOT_CALLSIGN))
-                print("        sent %d bytes\n" % len(event))
-            else:
-                print("        would send %d bytes\n" % len(event))
+                heard += 1
+                # Realtime factor under 1.0 means recognition is slower than
+                # speech, which is the number that decides whether this holds
+                # up under continuous chatter.
+                rtf = clip.duration / asr if asr else 0.0
+                flags = ""
+                if stats["backlog"]:
+                    flags += "  backlog %d" % stats["backlog"]
+                if stats["dropped"] > last_dropped:
+                    flags += "  DROPPED %d" % (stats["dropped"] - last_dropped)
+                    last_dropped = stats["dropped"]
+
+                print("[%2d] %.1fs audio, %.1fs asr (%.1fx)%s"
+                      % (heard, clip.duration, asr, rtf, flags))
+                print("     %s" % report["text"])
+                print("     %s / %s / %s  conf %.2f"
+                      % (report["intent"], report["agency"],
+                         report.get("unit") or "-",
+                         report.get("confidence", 0.0)))
+
+                event = to_cot(report, args.lat, args.lon,
+                               uid_prefix=UID_PREFIX)
+                if sa is not None:
+                    sa.send(event)
+                    chat.send(cot.geochat(
+                        "%s: %s" % (report.get("unit") or "UNKNOWN",
+                                    report["text"]),
+                        sender_uid="%s-bot" % UID_PREFIX,
+                        sender_callsign=BOT_CALLSIGN))
+                    print("     sent %d bytes\n" % len(event))
+                else:
+                    print("     would send %d bytes\n" % len(event))
 
 
 def main() -> None:
@@ -143,6 +171,10 @@ def main() -> None:
     ap.add_argument("--gain", type=float, default=1.0,
                     help="digital gain on the mic, for when the OS input level "
                          "is low and locked (managed laptop, cheap USB mic)")
+    ap.add_argument("--silence", type=float, default=0.8,
+                    help="seconds of quiet that ends an utterance. Lower it "
+                         "for clipped radio traffic, raise it if one sentence "
+                         "keeps splitting in two (default: 0.8)")
     ap.add_argument("--url", help="where to SEND (default: the mesh SA group)")
     ap.add_argument("--chat-url", default=CHAT_URL,
                     help="GeoChat multicast group (default: %s)" % CHAT_URL)
