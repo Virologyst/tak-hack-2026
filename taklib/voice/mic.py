@@ -196,7 +196,7 @@ class MicCapture:
         self.threshold = max(floor, ambient * multiplier)
         return self.threshold
 
-    def meter(self, seconds: float = 20.0) -> float:
+    def meter(self, seconds: float = 12.0) -> float:
         """Print a live input-level bar. Returns the peak RMS seen.
 
         Run this first whenever "it isn't hearing me". A flat zero means the
@@ -212,10 +212,22 @@ class MicCapture:
         while not self._q.empty():
             self._q.get_nowait()
 
+        import sys
+
+        # A \r-animated bar looks like nothing at all when stdout is not a
+        # live terminal - piped, captured, or run from an IDE button. Fall
+        # back to one discrete line per tick so there is always visible proof
+        # the thing is running.
+        animate = sys.stdout.isatty()
+
         peak = 0.0
-        deadline = time.time() + seconds
-        print("speak now - Ctrl-C to stop early")
-        print("  level                                     rms      state")
+        started = time.time()
+        deadline = started + seconds
+        tick = 0.0
+        print("SPEAK NOW - measuring for %d seconds (gain %.1fx)"
+              % (seconds, self.gain), flush=True)
+        print("  level                                     rms      state",
+              flush=True)
         try:
             while time.time() < deadline:
                 try:
@@ -228,11 +240,17 @@ class MicCapture:
                 # are useless at the bottom where the interesting part is.
                 filled = min(40, int((rms ** 0.5) * 90))
                 state = "SPEECH" if rms >= self.threshold else ""
-                print("  [%-40s] %.5f  %s" % ("#" * filled, rms, state),
-                      end="\r", flush=True)
+                line = "  [%-40s] %.5f  %s" % ("#" * filled, rms, state)
+                now = time.time()
+                if animate:
+                    print(line, end="\r", flush=True)
+                elif now - tick >= 0.5:      # 2 lines a second is readable
+                    tick = now
+                    print("%s  %4.1fs" % (line, now - started), flush=True)
         except KeyboardInterrupt:
-            pass
-        print()
+            print("\n  (stopped early)")
+        if animate:
+            print()
         return peak
 
     def utterances(self) -> Iterator[AudioClip]:
