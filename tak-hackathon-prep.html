@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TAK Hackathon Prep Pack</title>
+<style>
+  :root{
+    --bg:#0d1411; --panel:#131d19; --panel2:#0f1815; --line:#26362e;
+    --ink:#e6efe9; --mut:#8fa89b; --dim:#6f877b;
+    --acc:#5fd08a; --acc2:#79b8ff; --warn:#f2c14e; --hot:#f0736a;
+    --code:#0a100d; --codeink:#cfe8d8;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;
+    background-image:radial-gradient(circle at 15% -10%,rgba(95,208,138,.07),transparent 40%),radial-gradient(circle at 90% 0%,rgba(121,184,255,.05),transparent 35%);}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 80px}
+  header.top{border:1px solid var(--line);border-radius:14px;padding:26px 28px;background:linear-gradient(180deg,#16241d,#101a16);position:relative;overflow:hidden}
+  header.top:before{content:"";position:absolute;inset:0;background:
+    repeating-linear-gradient(90deg,transparent,transparent 38px,rgba(95,208,138,.04) 38px,rgba(95,208,138,.04) 39px);pointer-events:none}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--acc)}
+  h1{margin:6px 0 4px;font-size:30px;letter-spacing:-.01em}
+  .sub{color:var(--mut);font-size:15px;max-width:70ch}
+  .tags{margin-top:14px;display:flex;flex-wrap:wrap;gap:8px}
+  .tag{font-family:var(--mono);font-size:11.5px;letter-spacing:.05em;padding:4px 9px;border:1px solid var(--line);border-radius:999px;color:var(--mut);background:var(--panel2)}
+  h2{font-size:20px;margin:40px 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .n{font-family:var(--mono);font-size:12px;color:var(--acc);border:1px solid var(--line);border-radius:6px;padding:2px 7px;background:var(--panel2)}
+  .lead{color:var(--mut);font-size:14.5px;margin:2px 0 16px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--panel)}
+  .card h3{margin:0 0 6px;font-size:15.5px}
+  .card p{margin:0;color:var(--mut);font-size:13.5px}
+  .card .role{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);display:block;margin-bottom:7px}
+  .open{color:var(--acc)} .gov{color:var(--warn)}
+  code{font-family:var(--mono);font-size:12.5px;background:#17241d;color:var(--codeink);padding:1.5px 6px;border-radius:5px;border:1px solid var(--line)}
+  pre{margin:12px 0 0;background:var(--code);border:1px solid var(--line);border-radius:10px;padding:15px 16px;overflow:auto;font-family:var(--mono);font-size:12.5px;color:var(--codeink);line-height:1.5}
+  pre .c{color:#6f877b} pre .k{color:#79b8ff} pre .s{color:#e0b978} pre .g{color:#5fd08a} pre .t{color:#f0a35c}
+  table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  td code{white-space:nowrap}
+  .callout{border-left:3px solid var(--acc);background:var(--panel2);border-radius:0 10px 10px 0;padding:12px 16px;margin-top:14px;font-size:13.5px;color:var(--mut)}
+  .callout.warn{border-color:var(--warn)} .callout.hot{border-color:var(--hot)}
+  .callout b{color:var(--ink)}
+  ul.clean{margin:10px 0 0;padding-left:18px;color:var(--mut);font-size:13.5px}
+  ul.clean li{margin:5px 0}
+  ul.clean li b{color:var(--ink)}
+  .check{list-style:none;padding:0;margin:12px 0 0}
+  .check li{padding:8px 0 8px 30px;position:relative;border-bottom:1px solid var(--line);font-size:13.5px;color:var(--mut)}
+  .check li:before{content:"";position:absolute;left:2px;top:11px;width:15px;height:15px;border:1.5px solid var(--acc);border-radius:4px}
+  .check li b{color:var(--ink)}
+  .idea{border:1px solid var(--line);border-radius:12px;padding:15px 16px;background:var(--panel)}
+  .idea .lvl{float:right;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+  .lvl.e{color:var(--acc)} .lvl.m{color:var(--acc2)} .lvl.h{color:var(--warn)}
+  .idea h3{margin:0 0 5px;font-size:14.5px} .idea p{margin:0;color:var(--mut);font-size:13px}
+  a{color:var(--acc2);text-decoration:none} a:hover{text-decoration:underline}
+  .foot{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:12px}
+  .foot a{color:var(--mut)}
+  .port{font-family:var(--mono)}
+  .kbd{font-family:var(--mono);font-size:11.5px;color:var(--acc);border:1px solid var(--line);border-radius:5px;padding:1px 6px;background:var(--panel2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="eyebrow">// Situational Awareness · Field Brief</div>
+    <h1>TAK Hackathon Prep Pack</h1>
+    <div class="sub">Everything you need to hit the ground running on an ATAK / TAK build. Ecosystem map, the CoT protocol, how to stream to their server IP, build paths, and a pre-event checklist. Verify live version numbers on tak.gov — the TAK 5.6 line shipped March 2026.</div>
+    <div class="tags">
+      <span class="tag">ATAK-CIV</span><span class="tag">TAK Server 5.6</span><span class="tag">Cursor-on-Target</span>
+      <span class="tag">pytak</span><span class="tag">Plugin SDK</span><span class="tag">CloudTAK</span>
+    </div>
+  </header>
+
+  <!-- 1. WHAT IS TAK -->
+  <h2><span class="n">01</span> The 60-second orientation</h2>
+  <p class="lead">TAK = <b>Team Awareness Kit</b>. A geospatial situational-awareness platform: shared map, live position tracking, chat, markers, routes, and sensor feeds across a team. Originally US gov, now with a large open-source ecosystem. Everything is glued together by one message format (CoT) flowing through a central server.</p>
+  <div class="grid g3">
+    <div class="card"><span class="role gov">Clients</span><h3>ATAK / iTAK / WinTAK</h3><p>Android, iOS and Windows clients. <b>ATAK-CIV</b> is the free civilian build (register on tak.gov). Plugins extend ATAK — that's the usual hackathon target.</p></div>
+    <div class="card"><span class="role gov">Backbone</span><h3>TAK Server</h3><p>Routes CoT between all clients, handles auth (X.509 certs), data packages, video, and federation. The IP they give you is almost certainly this.</p></div>
+    <div class="card"><span class="role open">Web / Cloud</span><h3>CloudTAK / WebTAK</h3><p>Browser-based client + API (CloudTAK is MIT-licensed, arguably the biggest open-source piece). Great for a no-install demo surface.</p></div>
+  </div>
+  <div class="callout"><b>Mental model:</b> sensors & clients emit <b>CoT events</b> → <b>TAK Server</b> fans them out → every connected map redraws. If your hack can produce a valid CoT stream to their server, it shows up on everyone's screen. That's the whole game.</div>
+
+  <!-- 2. ECOSYSTEM -->
+  <h2><span class="n">02</span> Ecosystem &amp; who's open source</h2>
+  <p class="lead">Know which pieces you can freely stand up yourself vs. which are gov-managed. For a hackathon you'll likely be handed a server and just need to connect to it.</p>
+  <table>
+    <tr><th>Component</th><th>What it is</th><th>License / access</th></tr>
+    <tr><td><b>ATAK-CIV</b></td><td>Android client; plugin host</td><td class="gov">Free w/ tak.gov account; core gov-managed, plugin API public</td></tr>
+    <tr><td><b>TAK Server</b></td><td>Official routing/auth server</td><td class="gov">tak.gov registration</td></tr>
+    <tr><td><b>FreeTAKServer (FTS)</b></td><td>Python server alternative, lighter</td><td class="open">Open (EPL) — easy to self-host for testing</td></tr>
+    <tr><td><b>taky</b></td><td>Minimal Python CoT router</td><td class="open">Open — dead-simple local server</td></tr>
+    <tr><td><b>CloudTAK</b></td><td>Server + REST/WebSocket + browser client</td><td class="open">MIT</td></tr>
+    <tr><td><b>pytak</b></td><td>Python CoT library (send/receive)</td><td class="open">Apache-2.0 — the fast path for a bridge</td></tr>
+    <tr><td><b>node-CoT / cotlib / takproto</b></td><td>JS / Go / Python CoT encode-decode</td><td class="open">Open</td></tr>
+    <tr><td><b>Plugin SDK</b></td><td>ATAK plugin templates + API</td><td class="gov">tak.gov download</td></tr>
+  </table>
+  <div class="callout warn"><b>Pre-register now.</b> A tak.gov account can take time to approve, and you need it for the ATAK-CIV APK and the Plugin SDK. Do this <b>before</b> the weekend. If approval is slow, you can still build & demo against FreeTAKServer/taky locally.</div>
+
+  <!-- 3. CoT -->
+  <h2><span class="n">03</span> Cursor-on-Target (CoT) — the one thing to actually learn</h2>
+  <p class="lead">Every position, marker, chat, and sensor report is a CoT <code>&lt;event&gt;</code>. Learn this XML and you can talk to the whole system. Detail child elements are free-form, so you can carry custom payloads.</p>
+  <pre><span class="c">&lt;!-- A friendly ground unit at a location --&gt;</span>
+<span class="k">&lt;event</span> <span class="t">version</span>=<span class="s">"2.0"</span>
+       <span class="t">uid</span>=<span class="s">"hack-team-alpha-01"</span>          <span class="c">&lt;!-- stable unique id per entity --&gt;</span>
+       <span class="t">type</span>=<span class="s">"a-f-G-U-C"</span>                <span class="c">&lt;!-- affiliation-domain-... (see table) --&gt;</span>
+       <span class="t">how</span>=<span class="s">"m-g"</span>                       <span class="c">&lt;!-- how derived: m-g = machine/GPS --&gt;</span>
+       <span class="t">time</span>=<span class="s">"2026-08-15T02:10:00Z"</span>
+       <span class="t">start</span>=<span class="s">"2026-08-15T02:10:00Z"</span>
+       <span class="t">stale</span>=<span class="s">"2026-08-15T02:15:00Z"</span><span class="k">&gt;</span>       <span class="c">&lt;!-- drops off map after this --&gt;</span>
+  <span class="k">&lt;point</span> <span class="t">lat</span>=<span class="s">"-27.4705"</span> <span class="t">lon</span>=<span class="s">"153.0260"</span>
+         <span class="t">hae</span>=<span class="s">"25.0"</span> <span class="t">ce</span>=<span class="s">"5.0"</span> <span class="t">le</span>=<span class="s">"10.0"</span><span class="k">/&gt;</span>  <span class="c">&lt;!-- WGS84; hae/ce/le in metres --&gt;</span>
+  <span class="k">&lt;detail&gt;</span>
+    <span class="k">&lt;contact</span> <span class="t">callsign</span>=<span class="s">"ALPHA-01"</span><span class="k">/&gt;</span>
+    <span class="k">&lt;__group</span> <span class="t">name</span>=<span class="s">"Cyan"</span> <span class="t">role</span>=<span class="s">"Team Lead"</span><span class="k">/&gt;</span>
+    <span class="k">&lt;remarks&gt;</span>your custom payload goes here<span class="k">&lt;/remarks&gt;</span>
+  <span class="k">&lt;/detail&gt;</span>
+<span class="k">&lt;/event&gt;</span></pre>
+
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card">
+      <span class="role">Event attributes (all required except noted)</span>
+      <ul class="clean">
+        <li><b>uid</b> — persistent id for the entity; reuse it to move a marker</li>
+        <li><b>type</b> — hierarchical type string (table below)</li>
+        <li><b>how</b> — data origin, e.g. <code>m-g</code> machine-GPS, <code>h-e</code> human-entered</li>
+        <li><b>time / start / stale</b> — ISO-8601 UTC; <b>stale</b> is when it disappears</li>
+        <li><b>point</b> — <code>lat</code>,<code>lon</code>,<code>hae</code> (height above ellipsoid), <code>ce</code>/<code>le</code> error</li>
+        <li><b>detail</b> — <b>no fixed schema</b>; put anything here</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="role">Common CoT type codes</span>
+      <table style="margin-top:4px">
+        <tr><td><code>a-f-G-U-C</code></td><td>Friendly ground combat unit</td></tr>
+        <tr><td><code>a-h-G</code></td><td>Hostile ground</td></tr>
+        <tr><td><code>a-u-G</code></td><td>Unknown ground</td></tr>
+        <tr><td><code>a-f-A</code></td><td>Friendly air track</td></tr>
+        <tr><td><code>b-m-p-s-p-loc</code></td><td>Mission waypoint / marker</td></tr>
+        <tr><td><code>b-t-f</code></td><td>GeoChat message</td></tr>
+      </table>
+      <p style="margin-top:8px;font-size:12px;color:var(--dim)">Affiliation: <code>f</code>riendly · <code>h</code>ostile · <code>n</code>eutral · <code>u</code>nknown. Domain: <code>G</code>round · <code>A</code>ir · <code>S</code>ea.</p>
+    </div>
+  </div>
+
+  <!-- 4. STREAMING -->
+  <h2><span class="n">04</span> Streaming to their server IP</h2>
+  <p class="lead">This is the part they described — "an IP to stream out on." Two protocol generations and three framings. Know the ports and you're connected in minutes.</p>
+  <table>
+    <tr><th>Path</th><th>Port</th><th>Notes</th></tr>
+    <tr><td>Streaming TCP (plain)</td><td class="port">8087</td><td>Simplest. Newline/null-delimited CoT XML.</td></tr>
+    <tr><td>Streaming TLS (cert auth)</td><td class="port">8089</td><td>Production path. Needs client cert from data package.</td></tr>
+    <tr><td>Mesh SA multicast (no server)</td><td class="port">239.2.3.1:6969</td><td>Local UDP mesh; devices on same LAN see each other.</td></tr>
+    <tr><td>Cert enrollment / web API</td><td class="port">8443 / 8446</td><td>Where clients pull certs & data packages.</td></tr>
+  </table>
+  <div class="callout"><b>TAK Protocol v0 vs v1.</b> v0 = plain XML CoT. v1 = the same data as <b>Protobuf</b>, framed with a magic byte <code>0xBF</code> (191). Stream framing: <code>191 &lt;varint length&gt; &lt;payload&gt;</code>. Mesh framing: <code>191 1 191 &lt;payload&gt;</code>. Libraries like <code>takproto</code> handle all three so you rarely hand-roll this.</div>
+
+  <p class="lead" style="margin-top:20px">Fastest possible "put a marker on everyone's map" — Python + <b>pytak</b>:</p>
+  <pre><span class="c"># pip install pytak</span>
+<span class="k">import</span> asyncio, pytak
+<span class="k">import</span> xml.etree.ElementTree <span class="k">as</span> ET
+<span class="k">from</span> configparser <span class="k">import</span> ConfigParser
+
+<span class="k">class</span> <span class="g">Sender</span>(pytak.QueueWorker):
+    <span class="k">async def</span> <span class="g">run</span>(self):
+        <span class="k">while</span> True:
+            evt = ET.Element(<span class="s">"event"</span>)
+            evt.set(<span class="s">"version"</span>,<span class="s">"2.0"</span>); evt.set(<span class="s">"type"</span>,<span class="s">"a-f-G-U-C"</span>)
+            evt.set(<span class="s">"uid"</span>,<span class="s">"hack-alpha-01"</span>); evt.set(<span class="s">"how"</span>,<span class="s">"m-g"</span>)
+            evt.set(<span class="s">"time"</span>,pytak.cot_time()); evt.set(<span class="s">"start"</span>,pytak.cot_time())
+            evt.set(<span class="s">"stale"</span>,pytak.cot_time(120))
+            pt = ET.SubElement(evt,<span class="s">"point"</span>)
+            pt.set(<span class="s">"lat"</span>,<span class="s">"-27.4705"</span>); pt.set(<span class="s">"lon"</span>,<span class="s">"153.0260"</span>)
+            pt.set(<span class="s">"hae"</span>,<span class="s">"25"</span>); pt.set(<span class="s">"ce"</span>,<span class="s">"5"</span>); pt.set(<span class="s">"le"</span>,<span class="s">"10"</span>)
+            <span class="k">await</span> self.put_queue(ET.tostring(evt))
+            <span class="k">await</span> asyncio.sleep(5)
+
+<span class="k">async def</span> <span class="g">main</span>():
+    cfg = ConfigParser()
+    cfg[<span class="s">"x"</span>] = {<span class="s">"COT_URL"</span>: <span class="s">"tcp://THEIR_SERVER_IP:8087"</span>}   <span class="c"># TLS: tls://IP:8089 + cert paths</span>
+    tool = pytak.CLITool(cfg[<span class="s">"x"</span>]); <span class="k">await</span> tool.setup()
+    tool.add_tasks({Sender(tool.tx_queue, cfg[<span class="s">"x"</span>])})
+    <span class="k">await</span> tool.run()
+
+asyncio.run(main())</pre>
+  <div class="callout warn">For <b>TLS (8089)</b> add <code>PYTAK_TLS_CLIENT_CERT</code> / <code>PYTAK_TLS_CLIENT_KEY</code> pointing at the cert & key you extract from the server's data package (<code>.p12</code> → convert with <code>openssl</code>). If they hand you a data package, that's where your creds live.</div>
+
+  <!-- 5. BUILD PATHS -->
+  <h2><span class="n">05</span> Pick your build path</h2>
+  <p class="lead">Match the path to your team's stack and the (unknown) problem statement. You can decide fast once you see it — but pre-install the one you're most likely to use.</p>
+  <div class="grid g3">
+    <div class="card">
+      <span class="role open">Fastest to demo</span>
+      <h3>Python / bridge</h3>
+      <p><b>pytak</b> or <b>takproto</b> to push external data (sensors, APIs, ML output) into TAK as CoT. Ideal for "get X onto the map." No Android build. Runs anywhere.</p>
+    </div>
+    <div class="card">
+      <span class="role gov">Deepest integration</span>
+      <h3>ATAK plugin</h3>
+      <p>Java/Kotlin on the SDK (5.5/5.6 line). New UI, tools, overlays inside ATAK itself. Highest wow-factor, steepest setup — Android Studio + keystore + dev APK.</p>
+    </div>
+    <div class="card">
+      <span class="role open">No-install surface</span>
+      <h3>Web / CloudTAK</h3>
+      <p>Browser client + REST/WebSocket API. Great for dashboards, judges' view, or a control panel that doesn't need a phone in hand.</p>
+    </div>
+  </div>
+
+  <div class="callout hot" style="margin-top:16px"><b>ATAK plugin setup (if you go that route):</b> Android Studio (Narwhal+), Gradle 8.13 / AGP 8.9, build variant <code>civDebug</code>, set run config Launch → "Nothing" (plugin loads on top of the base app), install the dev ATAK APK from the SDK, then build & deploy. SDK 5.5+ removed the old Java-version headaches and added Jetpack Compose support. Kotlin + <code>MapComponent</code> (entry point) + <code>DropDownReceiver</code> (UI) is the standard skeleton.</div>
+
+  <!-- 6. IDEAS -->
+  <h2><span class="n">06</span> Idea seeds (adapt to the problem statement)</h2>
+  <p class="lead">Patterns that judge well at TAK hackathons — most reduce to "fuse a new data source onto the shared map" or "make a decision faster in the field."</p>
+  <div class="grid g2">
+    <div class="idea"><span class="lvl e">EASY</span><h3>Live sensor → map bridge</h3><p>Pull a public feed (weather, ADS-B, AIS, traffic, fire/flood alerts) and stream it as CoT markers. Instant visible payoff.</p></div>
+    <div class="idea"><span class="lvl m">MED</span><h3>AI object detection → CoT</h3><p>Run a vision model on a drone/camera feed, emit detections as hostile/unknown markers with confidence in the detail block.</p></div>
+    <div class="idea"><span class="lvl m">MED</span><h3>GeoChat bot / assistant</h3><p>An agent that answers over GeoChat: nearest asset, ETA, "summarise activity in this area." Ties in nicely with an LLM.</p></div>
+    <div class="idea"><span class="lvl h">AMBITIOUS</span><h3>In-ATAK plugin tool</h3><p>New drop-down: route optimiser, medevac coordinator, comms-relay planner, or offline mesh status — rendered right on the operator's map.</p></div>
+    <div class="idea"><span class="lvl e">EASY</span><h3>Web ops dashboard</h3><p>CloudTAK/WebSocket dashboard aggregating all CoT into charts + a judges'-eye overview. Good "second screen" for the demo.</p></div>
+    <div class="idea"><span class="lvl m">MED</span><h3>Data-package generator</h3><p>Tool that builds shareable overlays/geofences (KML/GeoJSON → data package) from an address, mission brief, or CSV.</p></div>
+  </div>
+
+  <!-- 7. CHECKLIST -->
+  <h2><span class="n">07</span> Pre-event checklist</h2>
+  <p class="lead">Knock these out before you walk in so the weekend is all building.</p>
+  <ul class="check">
+    <li><b>Register a tak.gov account</b> — required for ATAK-CIV APK + Plugin SDK (approval can lag, do it first)</li>
+    <li><b>Install ATAK-CIV</b> on an Android phone/tablet, or an emulator, and click around</li>
+    <li><b>Stand up a throwaway server</b> — FreeTAKServer or <code>taky</code> locally so you can test CoT before the event server exists</li>
+    <li><b>Pre-install a build path</b> — <code>pip install pytak takproto</code> and/or Android Studio + Plugin SDK unzipped</li>
+    <li><b>Grab CoT libraries</b> for your language — pytak (Py), node-CoT (JS), cotlib (Go)</li>
+    <li><b>Test the loopback</b> — run the pytak sender above against your local server and watch a marker appear</li>
+    <li><b>Learn the cert flow</b> — how to pull a data package &amp; extract <code>.p12</code> → cert/key for TLS:8089</li>
+    <li><b>Bring the kit</b> — Android device + USB cable, laptop w/ Android Studio, phone charger, hotspot as backup LAN</li>
+  </ul>
+
+  <!-- 8. QUICK REF -->
+  <h2><span class="n">08</span> Wall-of-ports quick reference</h2>
+  <div class="grid g2">
+    <div class="card"><span class="role">Ports</span>
+      <ul class="clean">
+        <li><b>8087</b> — CoT streaming TCP (plain)</li>
+        <li><b>8089</b> — CoT streaming TLS (cert auth)</li>
+        <li><b>8443 / 8446</b> — web UI / cert enrollment API</li>
+        <li><b>239.2.3.1:6969</b> — mesh SA multicast (UDP)</li>
+      </ul>
+    </div>
+    <div class="card"><span class="role">First moves on arrival</span>
+      <ul class="clean">
+        <li>Get the <b>server IP</b> + a <b>data package</b> (creds/certs)</li>
+        <li>Connect ATAK to it; confirm you see teammates</li>
+        <li>Fire the pytak sender at it → confirm your marker lands</li>
+        <li>Then build your actual feature on top</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="foot">
+    Field brief compiled for the TAK hackathon · verify live versions on tak.gov before the event.<br>
+    Sources:
+    <a href="https://corvusintell.com/blog/field-apps/open-source-tak-ecosystem-guide/">Corvus — Open-source TAK ecosystem</a> ·
+    <a href="https://corvusintell.com/blog/c2-systems/cursor-on-target-cot-format/">Corvus — CoT format reference</a> ·
+    <a href="https://takproto.readthedocs.io/en/latest/tak_protocols/">takproto — TAK protocol framing</a> ·
+    <a href="https://pytak.readthedocs.io/en/latest/examples/">pytak — examples</a> ·
+    <a href="https://www.riis.com/blog/plugins-with-atak-civ-sdk-5-5">RIIS — ATAK-CIV SDK 5.5</a> ·
+    <a href="https://www.civtak.org/">CivTAK</a> ·
+    <a href="https://github.com/snstac/pytak">pytak (GitHub)</a>
+  </div>
+
+</div>
+</body>
+</html>

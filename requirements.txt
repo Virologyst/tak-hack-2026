@@ -1,0 +1,2 @@
+pytak>=6.0.0
+takproto>=3.0.0

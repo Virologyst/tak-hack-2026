@@ -1,0 +1,16 @@
+[bridge]
+# --- Plain TCP (simplest; use this first) ---
+COT_URL = tcp://127.0.0.1:8087
+# On event day, swap 127.0.0.1 for THE SERVER IP they give you:
+# COT_URL = tcp://10.0.0.42:8087
+
+# --- TLS with client cert (production TAK Server, port 8089) ---
+# COT_URL = tls://SERVER_IP:8089
+# PYTAK_TLS_CLIENT_CERT = ./certs/client.pem
+# PYTAK_TLS_CLIENT_KEY  = ./certs/client.key
+# PYTAK_TLS_CLIENT_PASSWORD = changeit
+# PYTAK_TLS_DONT_VERIFY = 1        # only for quick testing with self-signed certs
+
+# Tip: TAK data packages ship a .p12 bundle. Extract cert + key with:
+#   openssl pkcs12 -in truststore.p12 -out client.pem -clcerts -nokeys
+#   openssl pkcs12 -in truststore.p12 -out client.key -nocerts -nodes
