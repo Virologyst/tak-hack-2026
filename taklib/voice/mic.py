@@ -254,6 +254,21 @@ class MicCapture:
             print()
         return peak
 
+    def blocks(self) -> Iterator["object"]:
+        """Yield raw ~30 ms blocks, gain applied, with no VAD in the way.
+
+        For streaming recognisers that segment speech themselves - feeding
+        them VAD-trimmed clips would throw away the context they use to decide
+        where a line ends.
+        """
+        if self._stream is None:
+            self.open()
+        while True:
+            try:
+                yield self._q.get(timeout=1.0)
+            except queue.Empty:
+                continue
+
     def utterances(self) -> Iterator[AudioClip]:
         """Yield one clip per detected utterance. Runs until interrupted."""
         import numpy as np
