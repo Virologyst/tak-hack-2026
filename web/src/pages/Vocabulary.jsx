@@ -19,6 +19,23 @@ const api = async (path, opts) => {
   return body
 }
 
+/* Show which part of a suggestion matched. The match can be anywhere in the
+   term, so without this it is not obvious why "precisionlocation" appears when
+   you typed "loc". */
+function highlight(word, query) {
+  const q = (query || '').trim().toLowerCase()
+  if (!q) return word
+  const at = word.toLowerCase().indexOf(q)
+  if (at === -1) return word
+  return (
+    <>
+      {word.slice(0, at)}
+      <mark>{word.slice(at, at + q.length)}</mark>
+      {word.slice(at + q.length)}
+    </>
+  )
+}
+
 let keySeq = 0
 const blankRow = () => ({
   key: `r${++keySeq}`, id: null, trigger: '', tak_word: '', comments: '',
@@ -258,8 +275,26 @@ function Cell({ row, field, placeholder, mono, onCommit, catalogue }) {
     || catalogue.byWord.has(draft.trim().toLowerCase())
     || draft.trim().split(/\s+/).some((w) => catalogue.byWord.has(w.toLowerCase()))
 
+  // Shown whenever the field is focused and has text - NOT only when the text
+  // is invalid. Once you have typed something recognisable is exactly when you
+  // may still want a longer term ("fire" -> "fire incident"), and hiding the
+  // list there means the only way to discover it is to already know it.
   const matches = isTak && catalogue && isFocused && draft.trim()
-    ? catalogue.search(draft, 8) : []
+    ? catalogue.search(draft, 10) : []
+
+  // Open upward when there is not enough room below. Rows near the bottom of
+  // the table are exactly where you are most likely to be typing - it is the
+  // new-term row - so a list that always drops downward is invisible precisely
+  // when it is most needed.
+  const wrap = useRef(null)
+  const [above, setAbove] = useState(false)
+  useEffect(() => {
+    if (!matches.length || !wrap.current) return
+    const box = wrap.current.getBoundingClientRect()
+    const needed = Math.min(300, matches.length * 30 + 12)
+    setAbove(box.bottom + needed > window.innerHeight - 8
+             && box.top - needed > 8)
+  }, [matches.length, draft])
 
   const pick = (word) => {
     setDraft(word)
@@ -267,7 +302,7 @@ function Cell({ row, field, placeholder, mono, onCommit, catalogue }) {
   }
 
   return (
-    <div className={isTak ? 'takcell' : undefined}>
+    <div className={isTak ? 'takcell' : undefined} ref={wrap}>
       <input
         className={`cell${mono ? ' mono' : ''}${draft !== value ? ' dirty' : ''}`
                    + (known ? '' : ' invalid')}
@@ -301,12 +336,12 @@ function Cell({ row, field, placeholder, mono, onCommit, catalogue }) {
           if (e.key === 'Escape') { setDraft(value); e.currentTarget.blur() }
         }}
       />
-      {isTak && matches.length > 0 && !known && (
-        <ul className="predict">
+      {isTak && matches.length > 0 && (
+        <ul className={`predict${above ? ' above' : ''}`}>
           {matches.map((m) => (
             <li key={m.word}>
               <button onMouseDown={(e) => { e.preventDefault(); pick(m.word) }}>
-                <span className="pw">{m.word}</span>
+                <span className="pw">{highlight(m.word, draft)}</span>
                 <span className={`pc ${m.category}`}>{m.category}</span>
                 <span className="pe">{m.effect}</span>
               </button>

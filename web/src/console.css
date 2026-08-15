@@ -114,7 +114,10 @@ p.page-sub { margin: 0 0 22px; color: var(--mut); max-width: 74ch; }
   /* Tight when collapsed so the whole set reads as a list, roomier once open. */
   margin-bottom: 6px;
   background: var(--panel);
-  overflow: hidden;
+  /* NOT overflow:hidden - it clipped the prediction dropdown at the card edge,
+     so suggestions for a row near the bottom were invisible. Rounded corners
+     are handled on the header instead. */
+  overflow: visible;
 }
 .svc.open { margin-bottom: 18px; }
 .svc.core { border-color: #35503f; }
@@ -125,7 +128,9 @@ p.page-sub { margin: 0 0 22px; color: var(--mut); max-width: 74ch; }
   gap: 12px;
   padding: 4px 14px 4px 6px;
   background: #0f1814;
+  border-radius: 3px 3px 0 0;
 }
+.svc:not(.open) .svc-head { border-radius: 3px; }
 .svc.open .svc-head { border-bottom: 1px solid var(--line); }
 
 /* The whole name/count block is the hit target - a bare caret is a tiny thing
@@ -282,20 +287,43 @@ input.cell.invalid {
 
 .predict {
   position: absolute;
-  z-index: 30;
+  /* Above everything: the table, the next service card, and the sticky bits.
+     A suggestion list you cannot read is worse than none, because you act on
+     the half of it you can see. */
+  z-index: 500;
   top: calc(100% + 2px);
   left: 0;
-  min-width: 380px;
-  max-width: 520px;
-  max-height: 260px;
+  min-width: 420px;
+  max-width: 560px;
+  max-height: 300px;
   overflow-y: auto;
   margin: 0;
   padding: 3px;
   list-style: none;
-  background: #0b120f;
+  /* Fully opaque, not a tint of the panel - it sits over table rows and any
+     transparency makes the text underneath bleed through and fight it. */
+  background: #050908;
   border: 1px solid var(--acc);
   border-radius: 3px;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+}
+
+/* Flipped above the field when there is no room below - which is the common
+   case, because the row you type into most is the new-term row at the bottom
+   of the table. */
+.predict.above {
+  top: auto;
+  bottom: calc(100% + 2px);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.85);
+}
+
+/* Highlight the part of the word that matched what was typed - the match can
+   be anywhere in the term, so without this it is not obvious why a suggestion
+   is in the list at all. */
+.predict mark {
+  background: none;
+  color: var(--acc);
+  font-weight: 700;
 }
 .predict li { margin: 0; }
 .predict button {
