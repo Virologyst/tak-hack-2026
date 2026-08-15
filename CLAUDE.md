@@ -7,26 +7,34 @@ shared brain.
 ## What this is
 
 A Python toolkit for a TAK (Team Awareness Kit) hackathon, 15–17 Aug 2026.
-The problem statement is **not released yet**. Everything here exists so that
-when it drops we build the actual idea instead of plumbing.
+The problem is **multi-agency deconfliction** during a rapidly evolving
+incident in a dense urban precinct — see `docs/PROBLEM.md` for the full brief
+and our reading of it. Voice input is the primary data path: nobody types
+during a crisis.
 
 ## The one architectural fact
 
-**We stream CoT out over UDP to a server the venue provides.** We are not
-running a TAK server and we do not need one. There is no handshake, no
-certificates, no connection to maintain — we build a Cursor-on-Target XML
-event and fire the datagram at their IP and port.
+**We stream CoT out over UDP multicast — no server, no certs.** This is ATAK
+mesh mode. Two multicast groups, confirmed by the organisers:
+
+| Purpose | Address |
+|---|---|
+| SA / position CoT | `udp://239.2.3.1:6969` |
+| GeoChat | `udp://224.10.10.1:17012` |
+
+Chat and SA go to **different groups**. Sending GeoChat to the SA group is
+silently invisible. Anything that talks needs two senders.
 
 ```
-our code ──> cot.unit(...) ──> UDP datagram ──> venue's server ──> everyone's map
+our code ──> cot.unit(...) ──> UDP datagram ──> multicast ──> everyone's map
 ```
 
 Set the target once and everything in the repo follows it:
 
 ```bash
-export COT_URL=udp://THEIR_IP:6969      # bash
-set COT_URL=udp://THEIR_IP:6969         # Windows cmd
-$env:COT_URL="udp://THEIR_IP:6969"      # PowerShell
+export COT_URL=udp://239.2.3.1:6969      # bash
+set COT_URL=udp://239.2.3.1:6969         # Windows cmd
+$env:COT_URL="udp://239.2.3.1:6969"      # PowerShell
 ```
 
 Consequences of UDP that shape how we work:
@@ -55,10 +63,16 @@ python tak.py status udp://IP:6969            # event-morning connectivity check
 python tak.py chat "message"                  # broadcast to GeoChat
 python tak.py dashboard --url udp://0.0.0.0:6969   # live web view, http://127.0.0.1:8080
 python tak.py serve                           # local TCP CoT router, for offline dev
+
+# Voice pipeline
+python examples/06_voice_to_cot.py --selftest        # rules only, no mic, no network
+python examples/06_voice_to_cot.py --mic --gain 50   # live mic -> CoT events
+python examples/07_voice_stream.py --gain 50          # streaming transcription
 ```
 
 `python tak.py selftest` is the first thing to run on any new machine. If it
-passes, that laptop can build and demo.
+passes, that laptop can build and demo. For voice, `--selftest` on example 06
+proves the interpret pipeline without needing a mic or speech model.
 
 ## Layout
 
@@ -73,12 +87,18 @@ passes, that laptop can build and demo.
 | `taklib/server.py` | Local CoT router for offline development |
 | `taklib/dashboard.py` | Live browser view — the judge-facing second screen |
 | `taklib/config.py` | URL/cert/identity resolution |
-| `examples/` | Runnable patterns — start here when the problem drops |
+| `taklib/voice/` | Speech-to-text backends and voice-to-CoT pipeline |
+| `taklib/voice/mic.py` | Mic capture, VAD, gain, level meter |
+| `taklib/voice/interpret.py` | Rule-based + optional LLM text-to-structured-report |
+| `taklib/voice/moonshine.py` | Moonshine backend (primary — fast, 15 MB) |
+| `web/` | React trigger-phrase management UI |
+| `examples/` | Runnable patterns — `06_voice_to_cot` and `07_voice_stream` are the live ones |
 | `docs/` | CoT reference, connection playbook, hackathon playbook |
 
-`taklib` is **pure standard library**. `pytak` and `takproto` are optional and
-only used if installed. A failed `pip install` on event morning must never be
-what stops us demoing.
+`taklib` core is **pure standard library**. `taklib.voice` imports its
+dependencies lazily — `import taklib` stays dependency-free. Speech backend:
+**moonshine** (15 MB, ~1.5x realtime on CPU). Phi-4-multimodal was tested and
+rejected (see `taklib/voice/phi4.py`).
 
 ## Writing CoT
 
@@ -128,14 +148,14 @@ feat/<what>             one branch per idea
 Commit and push often — a laptop dying at 3am should cost minutes, not hours.
 `config.ini`, `certs/`, `*.p12` and `.idea/` are gitignored; keep it that way.
 
-## When the problem statement drops
+## What we're building (problem is live)
 
-1. Re-read it and write the actual goal at the top of `docs/PROBLEM.md`.
-2. Pick the pattern from `examples/` closest to it — most TAK problems reduce
-   to *get this data onto the shared map* or *react to what's on the map*.
-3. Get the ugliest end-to-end version emitting real CoT within the first hour.
-   A crude thing on the map beats an elegant thing in a terminal.
-4. Only then make it good.
+See `docs/PROBLEM.md` for the full brief and our analysis. In short:
+multi-agency deconfliction — voice reports become CoT events, an engine
+detects resource conflicts and coverage gaps, and alerts fire over GeoChat.
+
+The voice pipeline (`taklib/voice/`) is working. Next: the deconfliction
+engine and the trigger-phrase web UI (`web/`).
 
 ## Gotchas
 
