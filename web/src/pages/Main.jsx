@@ -79,17 +79,46 @@ export default function Main({ events, engine, services, notACommand }) {
     api('/api/backends').then(setBackends).catch(() => {})
   }, [])
 
-  // Follow the newest transmission unless the operator has clicked back to an
-  // older one - scrolling away from what someone is reading is infuriating.
+  // Newest first. On a radio feed the latest transmission is the one that
+  // matters, and it should be under your eye without scrolling.
+  const ordered = [...events].reverse()
+  const newest = ordered[0]
+
+  // Follow the newest unless the operator has clicked back to an older one -
+  // moving the page away from what someone is reading is infuriating.
   useEffect(() => {
-    if (selected === null && leftRef.current) {
-      leftRef.current.scrollTop = leftRef.current.scrollHeight
-    }
+    if (selected === null && leftRef.current) leftRef.current.scrollTop = 0
   }, [events.length, selected])
 
   const current = selected
-    ? events.find((e) => e.id === selected) || events[events.length - 1]
-    : events[events.length - 1]
+    ? events.find((e) => e.id === selected) || newest
+    : newest
+
+  /* The panes reveal left to right as a transmission lands: heard, then what
+   * we made of it, then what went on the wire. It makes the direction of
+   * travel obvious to someone watching over a shoulder.
+   *
+   * Done with a CSS animation-delay per pane, keyed on the event id, and NOT
+   * with a stage counter. The counter version was measurably wrong: with
+   * utterances arriving about a second apart - which is just normal radio
+   * traffic - each new one reset the sequence before it finished, and the
+   * Cursor-on-Target pane sat permanently dimmed. An animation cannot get
+   * stuck like that. Every pane is always fully readable; only the entrance
+   * is staggered, and a new event simply restarts its own.
+   */
+
+  // Restart the header sweep on each new transmission by toggling a class.
+  // Nothing about the CONTENT depends on this, so a burst of traffic can at
+  // worst cut an animation short - it can never hide the text.
+  const [pulseOn, setPulseOn] = useState(false)
+  useEffect(() => {
+    if (!newest?.id) return
+    setPulseOn(false)
+    const on = requestAnimationFrame(() => setPulseOn(true))
+    const off = setTimeout(() => setPulseOn(false), 900)
+    return () => { cancelAnimationFrame(on); clearTimeout(off) }
+  }, [newest?.id])
+  const pulse = pulseOn ? ' pulse' : ''
 
   const running = engine?.state === 'running'
 
@@ -195,7 +224,7 @@ export default function Main({ events, engine, services, notACommand }) {
       )}
 
       <div className="panes">
-        <section className="pane">
+        <section className={`pane p1${pulse}`}>
           <header>Heard<span className="pcount">{events.length}</span></header>
           <div className="pane-body list" ref={leftRef}>
             {events.length === 0 && (
@@ -204,9 +233,10 @@ export default function Main({ events, engine, services, notACommand }) {
                 run one through without a microphone.
               </p>
             )}
-            {events.map((e) => (
+            {ordered.map((e, i) => (
               <button key={e.id}
-                      className={`heard${current && e.id === current.id ? ' on' : ''}`}
+                      className={`heard${current && e.id === current.id ? ' on' : ''}`
+                                 + (i === 0 && selected === null ? ' fresh' : '')}
                       onClick={() => setSelected(e.id)}>
                 <span className="hid">{e.id}</span>
                 <span className="htext">{e.raw}</span>
@@ -220,7 +250,7 @@ export default function Main({ events, engine, services, notACommand }) {
           </div>
         </section>
 
-        <section className="pane">
+        <section className={`pane p2${pulse}`}>
           <header>
             Sanitised
             {current?.service && <span className="pcount">{current.service}</span>}
@@ -242,7 +272,7 @@ export default function Main({ events, engine, services, notACommand }) {
           </div>
         </section>
 
-        <section className="pane">
+        <section className={`pane p3${pulse}`}>
           <header>
             Cursor-on-Target
             {current?.sent?.sa && <span className="pcount sent">sent</span>}

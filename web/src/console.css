@@ -651,3 +651,60 @@ tr.bad td { background: #1d1513; }
 .stub h2 { color: var(--ink); margin: 0 0 10px; font-size: 1.05rem; }
 .stub ul { margin: 12px 0 0; padding-left: 18px; }
 .stub li { margin-bottom: 6px; }
+
+/* ---------- pane cascade ----------
+ *
+ * A transmission sweeps the pane HEADERS left to right: heard, then what we
+ * made of it, then what went on the wire. It shows the direction of travel to
+ * somebody watching over a shoulder.
+ *
+ * The content itself never animates, and that is the whole lesson here. Two
+ * earlier versions dimmed the pane bodies - first with a React stage counter,
+ * then with a keyed CSS animation - and both failed the same way under real
+ * traffic: utterances about a second apart restarted the sequence before it
+ * finished, leaving the Cursor-on-Target pane sitting at quarter opacity
+ * during exactly the traffic the console exists for. An animation that can
+ * make the answer unreadable is not a nice touch, it is a fault. So the
+ * decoration lives on the header and the text is always at full strength.
+ */
+
+.panes .pane > header {
+  position: relative;
+  overflow: hidden;
+}
+
+.panes .pane > header::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: var(--acc);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.panes .pane.pulse > header::after {
+  animation: sweep 520ms ease-out;
+}
+.panes .p1.pulse > header::after { animation-delay: 0ms; }
+.panes .p2.pulse > header::after { animation-delay: 150ms; }
+.panes .p3.pulse > header::after { animation-delay: 300ms; }
+
+@keyframes sweep {
+  0%   { transform: scaleX(0); opacity: 1; }
+  55%  { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* The newest row in Heard, which is now the TOP one. */
+.heard.fresh { animation: heardIn 320ms ease-out; }
+
+@keyframes heardIn {
+  from { opacity: 0; transform: translateY(-6px); background: #16311f; }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panes .pane.pulse > header::after,
+  .heard.fresh { animation: none; }
+}
