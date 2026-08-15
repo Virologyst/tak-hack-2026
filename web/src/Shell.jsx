@@ -23,8 +23,13 @@ const TABS = [
 ]
 
 export default function Shell() {
-  const [tab, setTab] = useState('vocab')   // vocab first: it is what is ready
+  const [tab, setTab] = useState('main')
   const [health, setHealth] = useState(null)
+  const [live, setLive] = useState(false)
+  const [events, setEvents] = useState([])
+  const [engine, setEngine] = useState(null)
+  const [services, setServices] = useState([])
+  const [notACommand, setNotACommand] = useState('Not detected as a Tak command entry')
 
   useEffect(() => {
     let alive = true
@@ -36,6 +41,37 @@ export default function Shell() {
     poll()
     const timer = setInterval(poll, 5000)
     return () => { alive = false; clearInterval(timer) }
+  }, [])
+
+  /* EXACTLY ONE EventSource, and it lives here rather than on the Live page.
+   *
+   * HTTP/1.1 allows about six connections per origin. A stream opened per page
+   * would mean a few stale tabs exhaust the pool, after which every fetch on
+   * the site hangs - which looks identical to a dead server and is miserable to
+   * diagnose. One connection in the shell also means events keep arriving while
+   * you are editing vocabulary, so switching to Live shows history rather than
+   * an empty screen.
+   */
+  useEffect(() => {
+    const es = new EventSource('/api/stream')
+    es.addEventListener('open', () => setLive(true))
+    es.addEventListener('error', () => setLive(false))
+    es.addEventListener('hello', (m) => {
+      const d = JSON.parse(m.data)
+      setLive(true)
+      setEngine(d.engine)
+      setServices(d.services || [])
+      setEvents(d.recent || [])
+      if (d.not_a_command) setNotACommand(d.not_a_command)
+    })
+    es.addEventListener('engine', (m) => setEngine(JSON.parse(m.data)))
+    es.addEventListener('utterance', (m) => {
+      const ev = JSON.parse(m.data)
+      // Keyed by id so a reconnect replaying `recent` cannot duplicate rows.
+      setEvents((prev) => (prev.some((p) => p.id === ev.id)
+        ? prev : [...prev, ev].slice(-200)))
+    })
+    return () => es.close()
   }, [])
 
   return (
@@ -51,14 +87,16 @@ export default function Shell() {
           </button>
         ))}
         <div className="topbar-right">
-          {health
-            ? <><span className="dot">●</span> api up · vocab rev {health.revision}</>
-            : <><span className="dot bad">●</span> api unreachable</>}
+          {live
+            ? <><span className="dot">●</span> live</>
+            : <><span className="dot bad">●</span> reconnecting</>}
+          {health ? ` · vocab rev ${health.revision}` : ' · api unreachable'}
         </div>
       </div>
 
-      <div className="page">
-        {tab === 'main' && <Main />}
+      <div className={`page${tab === 'main' ? ' nopad' : ''}`}>
+        {tab === 'main' && <Main events={events} engine={engine}
+                                 services={services} notACommand={notACommand} />}
         {tab === 'vocab' && <Vocabulary />}
         {tab === 'settings' && <Settings />}
         {tab === 'legacy' && <App />}

@@ -38,8 +38,11 @@ import json
 import mimetypes
 import os
 import posixpath
+import queue
 import socket
 import sys
+import threading
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -48,12 +51,78 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
 import schema                       # noqa: E402
+import pipeline                    # noqa: E402
+from engine import Engine          # noqa: E402
 from vocab_store import InvalidTakWord, VocabStore  # noqa: E402
 from taklib import types as tak_types  # noqa: E402
 from taklib.voice import takwords    # noqa: E402
 
 STORE = VocabStore()
 STATIC_DIR = os.path.join(HERE, "dist")
+
+# --- SSE fan-out -------------------------------------------------------------
+# Lifted from taklib/dashboard.py, which has been working since day one. One
+# bounded queue per connected browser, guarded by a lock.
+
+_subscribers: "list[queue.Queue]" = []
+_sub_lock = threading.Lock()
+
+
+def publish(event: str, payload: dict) -> None:
+    """Fan one event out to every browser. Never blocks, never raises.
+
+    Backpressure is split by event type on purpose: a slow browser loses its
+    `partial` and `stats` updates, which are invisible, but is dropped entirely
+    rather than lose an `utterance`, which is not.
+    """
+    item = (event, payload)
+    with _sub_lock:
+        dead = []
+        for q in _subscribers:
+            try:
+                q.put_nowait(item)
+            except queue.Full:
+                if event == "utterance":
+                    dead.append(q)
+        for q in dead:
+            _subscribers.remove(q)
+
+
+def _active_server() -> dict:
+    """The server row the engine should send to, or the mesh defaults."""
+    conn = STORE.connect()
+    try:
+        row = conn.execute(
+            "SELECT * FROM servers WHERE active = 1 LIMIT 1").fetchone()
+        return dict(row) if row else {}
+    except Exception:
+        return {}
+    finally:
+        conn.close()
+
+
+def _not_a_command() -> str:
+    from taklib.voice.interpret import NOT_A_COMMAND
+    return NOT_A_COMMAND
+
+
+def _audio_devices() -> list:
+    """Input devices, so the radio's line-in can be picked from the UI."""
+    try:
+        import sounddevice as sd
+    except Exception as exc:
+        return [{"error": "sounddevice not installed (%s)" % exc}]
+    try:
+        return [{"index": i, "name": d["name"],
+                 "channels": d["max_input_channels"],
+                 "rate": int(d["default_samplerate"])}
+                for i, d in enumerate(sd.query_devices())
+                if d["max_input_channels"] > 0]
+    except Exception as exc:
+        return [{"error": str(exc)}]
+
+
+ENGINE = Engine(publish, STORE, _active_server)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -125,10 +194,68 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/vocab":
             return self._send(200, STORE.export_json())
+
+        if path == "/api/engine":
+            return self._send(200, ENGINE.status())
+
+        if path == "/api/devices":
+            return self._send(200, {"devices": _audio_devices()})
+
+        if path == "/api/stream":
+            return self._stream()
+
         if path.startswith("/api/"):
             return self._send(404, {"error": "no such endpoint"})
 
         return self._static(path)
+
+    # -- server-sent events ---------------------------------------------------
+
+    def _stream(self):
+        """One long-lived response per browser. Needs ThreadingHTTPServer.
+
+        The 15s keepalive is load-bearing, not cosmetic: it is the only thing
+        that raises BrokenPipeError on a browser that has gone away, and so the
+        only thing that ever reaps a dead subscriber thread.
+        """
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")     # defeat proxy buffering
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+
+        q: "queue.Queue" = queue.Queue(maxsize=500)
+        with _sub_lock:
+            _subscribers.append(q)
+
+        try:
+            self._sse("hello", {
+                "engine": ENGINE.status(),
+                "services": [s["name"] for s in STORE.list_services()],
+                "server": _active_server(),
+                "recent": ENGINE.recent[-20:],
+                "not_a_command": _not_a_command(),
+            })
+            while True:
+                try:
+                    event, payload = q.get(timeout=15)
+                    self._sse(event, payload)
+                except queue.Empty:
+                    self.wfile.write(b": keepalive\n\n")
+                    self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            pass
+        finally:
+            with _sub_lock:
+                if q in _subscribers:
+                    _subscribers.remove(q)
+
+    def _sse(self, event: str, payload: dict):
+        body = json.dumps(payload)
+        self.wfile.write(("event: %s\ndata: %s\n\n" % (event, body)).encode())
+        self.wfile.flush()
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
@@ -165,6 +292,38 @@ class Handler(BaseHTTPRequestHandler):
             result = STORE.import_json(body.get("payload", body),
                                        replace=bool(body.get("replace")))
             return self._send(200, result)
+
+        if path == "/api/engine/start":
+            return self._send(200, ENGINE.start(
+                source=body.get("source", "mic"),
+                device=body.get("device"),
+                wav=body.get("wav"),
+                service=body.get("service") or None,
+                gain=float(body.get("gain", 1.0)),
+                threshold=body.get("threshold"),
+                silence=float(body.get("silence", 0.8)),
+                backend=body.get("backend") or None,
+                loop=bool(body.get("loop"))))
+
+        if path == "/api/engine/stop":
+            return self._send(200, ENGINE.stop())
+
+        if path == "/api/simulate":
+            # Type a sentence and watch it run the whole pipeline. No mic, no
+            # model, no network - the demo of last resort, and the fastest way
+            # to check a vocabulary change did what you meant.
+            ENGINE.seq += 1
+            event = pipeline.process(
+                body.get("text", ""), vocab=STORE.load(),
+                service=body.get("service") or None,
+                server=_active_server(), seq=ENGINE.seq,
+                clip={"simulated": True})
+            event["sent"] = {"sa": False, "chat": False, "url": None,
+                             "error": "simulated - nothing was transmitted"}
+            ENGINE.recent.append(event)
+            del ENGINE.recent[:-20]
+            publish("utterance", event)
+            return self._send(200, event)
 
         return self._send(404, {"error": "no such endpoint"})
 
