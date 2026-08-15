@@ -1,36 +1,46 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
-
-const DEFAULT_PHRASES = [
-  { id: 1, phrase: 'mayday', category: 'emergency' },
-  { id: 2, phrase: 'officer down', category: 'emergency' },
-  { id: 3, phrase: 'on scene', category: 'status' },
-  { id: 4, phrase: 'requesting backup', category: 'request' },
-  { id: 5, phrase: 'all clear', category: 'status' },
-  { id: 6, phrase: 'crowd surge', category: 'incident' },
-]
 
 const CATEGORIES = ['emergency', 'status', 'request', 'incident', 'custom']
 
 function App() {
-  const [phrases, setPhrases] = useState(DEFAULT_PHRASES)
+  const [phrases, setPhrases] = useState([])
   const [newPhrase, setNewPhrase] = useState('')
   const [newCategory, setNewCategory] = useState('custom')
   const [filter, setFilter] = useState('all')
+  const [error, setError] = useState(null)
 
-  const nextId = () => Math.max(0, ...phrases.map(p => p.id)) + 1
+  useEffect(() => {
+    fetch('/api/triggers')
+      .then(r => r.json())
+      .then(setPhrases)
+      .catch(() => setError('Cannot reach API — is api.py running?'))
+  }, [])
 
-  const addPhrase = (e) => {
+  const addPhrase = async (e) => {
     e.preventDefault()
     const trimmed = newPhrase.trim()
     if (!trimmed) return
-    if (phrases.some(p => p.phrase.toLowerCase() === trimmed.toLowerCase())) return
-    setPhrases([...phrases, { id: nextId(), phrase: trimmed, category: newCategory }])
-    setNewPhrase('')
+    setError(null)
+    const res = await fetch('/api/triggers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phrase: trimmed, category: newCategory }),
+    })
+    if (res.status === 201) {
+      const created = await res.json()
+      setPhrases([...phrases, created])
+      setNewPhrase('')
+    } else if (res.status === 409) {
+      setError('Phrase already exists')
+    }
   }
 
-  const removePhrase = (id) => {
-    setPhrases(phrases.filter(p => p.id !== id))
+  const removePhrase = async (id) => {
+    const res = await fetch(`/api/triggers/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setPhrases(phrases.filter(p => p.id !== id))
+    }
   }
 
   const filtered = filter === 'all'
@@ -43,6 +53,8 @@ function App() {
         <h1>TAK Voice Triggers</h1>
         <p className="subtitle">Words and phrases that trigger actions from voice input</p>
       </header>
+
+      {error && <div className="error">{error}</div>}
 
       <form className="add-form" onSubmit={addPhrase}>
         <input
