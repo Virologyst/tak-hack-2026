@@ -36,10 +36,10 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 import pipeline  # noqa: E402
 
-#: The speech engine for this project. The only one - the alternatives were
-#: tried, measured and deleted rather than left lying around. See
-#: requirements.txt for the numbers and docs/PROBLEM.md for the write-ups.
-DEFAULT_BACKEND = "moonshine"
+#: None means "let taklib.voice choose", which walks BACKEND_NAMES most
+#: accurate first: faster-whisper small.en, then moonshine. Pinning a name here
+#: would silently override an operator who installed the better engine.
+DEFAULT_BACKEND = None
 
 
 class Engine:
@@ -124,10 +124,10 @@ class Engine:
             # The dictionary the operator typed IS the language model hint.
             keyterms = list(vocab.keyterms(service)) or list(DEFAULT_KEYTERMS)
 
-            # Moonshine by name, not "whatever is installed". The choice is
-            # made; asking for it explicitly means a missing install fails with
-            # "moonshine is not installed" rather than silently falling back to
-            # something slower that behaves differently.
+            # No name unless the caller gave one: taklib.voice picks the most
+            # accurate installed engine. On radio-shaped audio that is
+            # faster-whisper small.en at 9.2% WER against moonshine TINY's
+            # 34.2%, which is the difference between a transcript and a guess.
             backend = backend or DEFAULT_BACKEND
             self._set_state("loading", model=backend)
             stt = get_transcriber(backend, keyterms=keyterms)
