@@ -9,11 +9,6 @@ lands on the shared map.
     python examples/06_voice_to_cot.py --say "ambulance seven on scene, two patients"
     python examples/06_voice_to_cot.py --wav clip.wav --url udp://239.2.3.1:6969
 
-Swap recogniser without touching code:
-
-    $env:TAK_STT="whisper"      # PowerShell
-    set TAK_STT=moonshine       # Windows cmd
-
 Mesh note: chat and SA go to *different* multicast groups, so this opens two
 senders. Sending GeoChat to the SA group is silently invisible - it does not
 error, it just never appears in anyone's chat window.
@@ -157,7 +152,7 @@ def run_mic(args, llm) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--backend", help="moonshine | whisper | phi4 (default: $TAK_STT)")
+    ap.add_argument("--backend", help="STT backend (moonshine; the only one)")
     ap.add_argument("--backends", action="store_true",
                     help="list backends and whether they can run here")
     ap.add_argument("--selftest", action="store_true",

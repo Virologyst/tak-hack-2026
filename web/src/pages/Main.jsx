@@ -72,8 +72,11 @@ export default function Main({ events, engine, services, notACommand }) {
   const [err, setErr] = useState('')
   const leftRef = useRef(null)
 
+  const [backends, setBackends] = useState(null)
+
   useEffect(() => {
     api('/api/devices').then((d) => setDevices(d.devices || [])).catch(() => {})
+    api('/api/backends').then(setBackends).catch(() => {})
   }, [])
 
   // Follow the newest transmission unless the operator has clicked back to an
@@ -126,7 +129,11 @@ export default function Main({ events, engine, services, notACommand }) {
     <div className="live">
       <div className="controls">
         <button className={`btn ${running ? 'danger' : 'primary'}`}
-                onClick={toggleEngine} disabled={busy}>
+                onClick={toggleEngine}
+                disabled={busy || (backends && !backends.any && !running)}
+                title={backends && !backends.any
+                  ? 'No speech backend on the interpreter running this server'
+                  : 'listen on the selected input'}>
           {running ? 'Stop listening' : 'Start listening'}
         </button>
 
@@ -170,6 +177,18 @@ export default function Main({ events, engine, services, notACommand }) {
           </button>
         </span>
       </div>
+
+      {backends && !backends.any && (
+        <div className="banner warn">
+          <strong>No speech backend on this server.</strong> Every page works and
+          you can still type transmissions above, but listening needs Moonshine —
+          which is installed in the project venv, not the system Python.
+          {backends.venv_python && (
+            <> Restart with:{' '}
+              <code>{backends.venv_python} web/app.py --host 0.0.0.0</code></>
+          )}
+        </div>
+      )}
 
       {(err || engine?.error) && (
         <div className="banner">{err || engine.error}</div>

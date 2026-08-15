@@ -106,6 +106,34 @@ def _not_a_command() -> str:
     return NOT_A_COMMAND
 
 
+def _backends() -> dict:
+    """Can this interpreter run Moonshine? Reported up front, not on click.
+
+    Only moonshine counts toward `any`. It is the project's speech engine, and
+    a console that quietly fell back to something slower with different
+    behaviour would be worse than one that says it cannot hear.
+
+    The usual cause of "no" is the wrong Python: moonshine lives in the project
+    venv, so `python web/app.py` serves every page perfectly and cannot
+    transcribe a word.
+    """
+    try:
+        from taklib.voice import available_backends
+        rows = [{"name": n, "ready": ok, "why": why}
+                for n, ok, why in available_backends()]
+    except Exception as exc:
+        return {"backends": [], "any": False, "python": sys.executable,
+                "engine": "moonshine", "error": str(exc)}
+    venv = os.path.join(os.path.dirname(HERE), ".venv", "Scripts", "python.exe")
+    moonshine = next((r for r in rows if r["name"] == "moonshine"), None)
+    return {"backends": rows,
+            "engine": "moonshine",
+            "any": bool(moonshine and moonshine["ready"]),
+            "why": moonshine["why"] if moonshine else "unknown",
+            "python": sys.executable,
+            "venv_python": venv if os.path.exists(venv) else None}
+
+
 def _audio_devices() -> list:
     """Input devices, so the radio's line-in can be picked from the UI."""
     try:
@@ -200,6 +228,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/devices":
             return self._send(200, {"devices": _audio_devices()})
+
+        if path == "/api/backends":
+            return self._send(200, _backends())
 
         if path == "/api/stream":
             return self._stream()
@@ -453,6 +484,23 @@ def main() -> int:
         print("  Or start elsewhere:  --port %d" % (args.port + 1))
         print("  Or override:  --force")
         return 1
+
+    # Say up front whether speech will work at all. The commonest failure is
+    # running this with the wrong interpreter - moonshine is installed in the
+    # project venv, so a bare `python web/app.py` can serve every page and
+    # still be unable to hear a word, which is only discovered on click.
+    info = _backends()
+    print("\nspeech backends (%s):" % os.path.basename(info["python"]))
+    for row in info["backends"]:
+        print("  %-10s %-5s %s" % (row["name"], "OK" if row["ready"] else "--",
+                                   row["why"]))
+    if not info["any"]:
+        print("\n  !! No speech backend on THIS interpreter - the vocabulary and")
+        print("     settings pages work, and /api/simulate works, but Start")
+        print("     listening cannot run.")
+        if info.get("venv_python"):
+            print("     Use the venv, which has moonshine:")
+            print("       %s web/app.py" % info["venv_python"])
 
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     shown = "127.0.0.1" if args.host in ("0.0.0.0", "") else args.host

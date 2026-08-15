@@ -36,6 +36,11 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 import pipeline  # noqa: E402
 
+#: The speech engine for this project. The only one - the alternatives were
+#: tried, measured and deleted rather than left lying around. See
+#: requirements.txt for the numbers and docs/PROBLEM.md for the write-ups.
+DEFAULT_BACKEND = "moonshine"
+
 
 class Engine:
     """Owns the capture thread, the recogniser, and the senders.
@@ -60,6 +65,7 @@ class Engine:
         self._lock = threading.Lock()
         self._sa = None
         self._chat = None
+        self._stream = None
 
     # -- lifecycle -----------------------------------------------------------
 
@@ -90,6 +96,15 @@ class Engine:
 
     def stop(self) -> dict:
         self._stop.set()
+        # Wake the capture loop. Without this it only notices the stop flag
+        # between utterances, so on a quiet channel the console sits at
+        # "stopping" until somebody happens to speak - which reads as a hang.
+        stream = getattr(self, "_stream", None)
+        if stream is not None:
+            try:
+                stream.stop()
+            except Exception:
+                pass
         self.state = "stopping"
         self._emit_engine()
         return {"ok": True}
@@ -105,9 +120,16 @@ class Engine:
             from taklib.voice.interpret import DEFAULT_KEYTERMS
 
             vocab = self.store.load()
+            # Bias the recogniser toward the words this service actually says.
+            # The dictionary the operator typed IS the language model hint.
             keyterms = list(vocab.keyterms(service)) or list(DEFAULT_KEYTERMS)
 
-            self._set_state("loading", model=backend or "auto")
+            # Moonshine by name, not "whatever is installed". The choice is
+            # made; asking for it explicitly means a missing install fails with
+            # "moonshine is not installed" rather than silently falling back to
+            # something slower that behaves differently.
+            backend = backend or DEFAULT_BACKEND
+            self._set_state("loading", model=backend)
             stt = get_transcriber(backend, keyterms=keyterms)
             stt.load()
 
@@ -249,6 +271,7 @@ class Engine:
         self.detail["threshold"] = round(mic.threshold, 5)
         self._emit_engine()
         stream = UtteranceStream(mic).start()
+        self._stream = stream            # so stop() can wake this loop
         try:
             for clip, stats in stream:
                 if self._stop.is_set():
@@ -258,6 +281,7 @@ class Engine:
                 yield clip, mic
         finally:
             stream.stop()
+            self._stream = None
 
     def _wav_clips(self, path, loop):
         """Feed a wav at wall-clock speed, as if it were being spoken.

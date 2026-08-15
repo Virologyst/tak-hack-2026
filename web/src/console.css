@@ -433,6 +433,23 @@ tr.bad td { background: #1d1513; }
   font-size: 0.9rem;
 }
 .banner.ok { border-color: #2c6a42; background: #101d15; color: var(--acc); }
+.banner.warn {
+  border-color: var(--warn);
+  background: #1c1810;
+  color: var(--warn);
+  margin: 10px 14px 0;
+}
+.banner.warn strong { color: var(--ink); }
+.banner.warn code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  background: #0b120f;
+  border: 1px solid var(--line);
+  padding: 2px 6px;
+  border-radius: 2px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
 
 .empty { color: var(--mut); padding: 14px; font-style: italic; }
 

@@ -1,10 +1,27 @@
-# taklib itself needs NOTHING from this file.
+# taklib CORE needs nothing from this file.
 #
-# Everything in tak.py and taklib/ is pure standard library, on purpose: a
-# failed pip install on event morning must never be the reason we can't demo.
+# Everything in tak.py and taklib/{cot,send,listen,geo,server,dashboard} is pure
+# standard library, on purpose: a failed pip install on event morning must never
+# be the reason we can't demo. That guarantee still holds - `import taklib` works
+# on a machine with none of the below.
 #
-# These are optional conveniences. Install them if you have working internet:
 #     pip install -r requirements.txt
+
+# --- SPEECH: REQUIRED for the voice console ---------------------------------
+# Moonshine is THE speech-to-text engine for this project. Not one option among
+# several - the decision is made. Measured on a Core Ultra 7: TINY_STREAMING
+# transcribes a 4.1s clip in 1.48s (2.8x realtime) at the same accuracy as the
+# library's much slower default, from a ~30 MB download and no GPU.
+#
+# `taklib.voice` imports it lazily, so the guarantee above is unaffected: the
+# CoT toolkit still runs without it, you just cannot hear anything.
+moonshine-voice>=0.1.2
+
+# Microphone capture. Comes in with moonshine-voice, listed because the mic
+# path depends on it directly and a transitive dependency is not a promise.
+sounddevice>=0.5.0
+
+# --- optional conveniences ---------------------------------------------------
 
 # Alternative async CoT sender with a worker/queue model. Useful if you prefer
 # its structure, or if you're following a pytak tutorial verbatim.

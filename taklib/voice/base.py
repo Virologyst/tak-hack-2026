@@ -42,11 +42,11 @@ class Transcriber:
     """Base class for speech backends.
 
     Subclasses must set `name` and implement `available()` and `transcribe()`.
-    `interpret()` is optional and returns None by default - only a backend that
-    can go from audio straight to structured output (currently just phi4)
-    overrides it. Callers should try `interpret()` first and fall back to
-    `transcribe()` plus a text interpreter, which is what
-    `taklib.voice.interpret.understand()` does for you.
+    `interpret()` is optional and returns None by default - it exists for a
+    backend that can go from audio straight to structured output. Moonshine
+    cannot, so nothing overrides it today; the hook stays because the
+    alternative is callers special-casing one class name. `understand()` in
+    `taklib.voice.interpret` handles the fallback for you.
     """
 
     name = "base"
@@ -163,7 +163,7 @@ def load_wav(path) -> AudioClip:
 
 
 def write_wav(path, samples: Sequence[float], sample_rate: int = SAMPLE_RATE) -> None:
-    """Write floats out as mono 16-bit PCM. Used to hand audio to whisper-cli."""
+    """Write floats out as mono 16-bit PCM. Handy for capturing a demo clip."""
     import array
     clipped = array.array(
         "h", (int(max(-1.0, min(1.0, s)) * 32767) for s in samples)

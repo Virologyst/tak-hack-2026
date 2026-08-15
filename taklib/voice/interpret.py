@@ -8,8 +8,9 @@ Three layers, deliberately in this order:
 2. **LLM** (`LLMInterpreter`) - optional. Talks to a local Ollama over plain
    `urllib`, so it adds no pip dependency. Use it to rescue sentences the rules
    miss.
-3. **Direct** - if the STT backend can go audio->JSON itself (phi4), skip
-   straight to that. `understand()` handles the choice.
+3. **Direct** - if a backend can go audio->JSON itself, skip straight to
+   that. `understand()` handles the choice; moonshine cannot, so today this
+   path is never taken.
 
 **Rules run first on purpose.** A demo that dies because a 1.7B model got
 creative at 3am is a bad demo. The LLM enriches; it is never load-bearing.
@@ -247,7 +248,7 @@ def understand(samples: Sequence[float], sample_rate: int, stt,
                llm: Optional[LLMInterpreter] = None) -> Dict:
     """Audio to a structured report, by whatever route this backend supports.
 
-    Order: the backend's own audio->JSON if it has one (phi4), otherwise
+    Order: the backend's own audio->JSON if it has one, otherwise
     transcribe and run the rules, optionally topped up by the LLM when the
     rules came back thin.
     """
