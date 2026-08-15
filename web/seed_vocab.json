@@ -7,6 +7,36 @@
       "sort_order": 0,
       "terms": [
         {
+          "trigger": "mayday",
+          "tak_word": "mayday",
+          "comments": "migrated from category=emergency"
+        },
+        {
+          "trigger": "officer down",
+          "tak_word": "officer down",
+          "comments": "migrated from category=emergency"
+        },
+        {
+          "trigger": "on scene",
+          "tak_word": "on scene",
+          "comments": "migrated from category=status"
+        },
+        {
+          "trigger": "requesting backup",
+          "tak_word": "requesting backup",
+          "comments": "migrated from category=request"
+        },
+        {
+          "trigger": "all clear",
+          "tak_word": "all clear",
+          "comments": "migrated from category=status"
+        },
+        {
+          "trigger": "crowd surge",
+          "tak_word": "",
+          "comments": "no TAK term - kept so the recogniser is biased to hear it"
+        },
+        {
           "trigger": "we're here",
           "tak_word": "on scene",
           "comments": ""
@@ -55,26 +85,6 @@
           "trigger": "back in service",
           "tak_word": "clear",
           "comments": ""
-        },
-        {
-          "trigger": "all clear",
-          "tak_word": "clear",
-          "comments": ""
-        },
-        {
-          "trigger": "mayday",
-          "tak_word": "emergency",
-          "comments": "raises priority to emergency"
-        },
-        {
-          "trigger": "officer down",
-          "tak_word": "emergency",
-          "comments": "raises priority to EMERGENCY; the casualty comes from the count"
-        },
-        {
-          "trigger": "crowd surge",
-          "tak_word": "",
-          "comments": "no TAK term - kept so the recogniser is biased to hear it"
         }
       ]
     },
@@ -123,7 +133,7 @@
         {
           "trigger": "load and go",
           "tak_word": "patient",
-          "comments": "a patient is being moved; count drives the CASEVAC"
+          "comments": "a patient is being moved; the count drives the CASEVAC"
         }
       ]
     },
@@ -134,8 +144,8 @@
       "terms": [
         {
           "trigger": "fire",
-          "tak_word": "fire",
-          "comments": "for firefighters \"fire\" IS the fire service - contrast SAS"
+          "tak_word": "fire incident",
+          "comments": "for firefighters 'fire' is the incident - contrast SAS"
         },
         {
           "trigger": "pumper",
@@ -157,12 +167,12 @@
         {
           "trigger": "fire",
           "tak_word": "(ignore)",
-          "comments": "SAS \"fire\" means shoot. It must NOT create a fire-service marker, so the word is deleted rather than mapped."
+          "comments": "SAS 'fire' means shoot - it must NOT create a fire-service marker, so the word is deleted rather than mapped"
         },
         {
           "trigger": "contact",
           "tak_word": "sighted",
-          "comments": "contact report becomes a sighting"
+          "comments": "contact report becomes a sighting ('sighting' matches nothing; 'sighted' does)"
         }
       ]
     },
@@ -179,6 +189,16 @@
         {
           "trigger": "rescue",
           "tak_word": "ses",
+          "comments": ""
+        },
+        {
+          "trigger": "sar",
+          "tak_word": "ses",
+          "comments": ""
+        },
+        {
+          "trigger": "moving",
+          "tak_word": "proceeding",
           "comments": ""
         }
       ]
