@@ -1,0 +1,297 @@
+/* TAK console styling.
+ *
+ * The palette is lifted verbatim from taklib/dashboard.py so the two screens
+ * match when they are side by side on a projector - the dashboard is the
+ * judge-facing map and this is the operator console, and them looking like one
+ * product costs nothing but is very visible.
+ *
+ * Deliberately not a framework. Three pages does not justify a dependency, and
+ * every npm package added is a lockfile conflict plus an install over
+ * contested venue wifi.
+ */
+
+:root {
+  --bg: #0d1411;
+  --panel: #131d19;
+  --line: #26362e;
+  --ink: #e6efe9;
+  --mut: #8fa89b;
+  --acc: #5fd08a;
+  --warn: #f2c14e;
+  --hot: #f0736a;
+  --blue: #79b8ff;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- shell ---------- */
+
+.shell { display: flex; flex-direction: column; height: 100%; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 52px;
+  padding: 0 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-right: 18px;
+  white-space: nowrap;
+}
+.brand span { color: var(--acc); }
+
+.tab {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--mut);
+  font: inherit;
+  padding: 7px 14px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.tab:hover { color: var(--ink); background: #0b120f; }
+.tab.active {
+  color: var(--ink);
+  border-color: var(--line);
+  background: var(--bg);
+}
+.tab:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mut);
+}
+.dot { color: var(--acc); }
+.dot.bad { color: var(--hot); }
+
+.page { flex: 1; overflow-y: auto; padding: 22px 20px 60px; }
+.page-inner { max-width: 1180px; margin: 0 auto; }
+
+h1.page-title {
+  font-size: 1.3rem;
+  margin: 0 0 4px;
+  letter-spacing: -0.015em;
+}
+p.page-sub { margin: 0 0 22px; color: var(--mut); max-width: 74ch; }
+
+/* ---------- vocabulary tables ---------- */
+
+.svc {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  margin-bottom: 18px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.svc.core { border-color: #35503f; }
+
+.svc-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #0f1814;
+}
+
+.svc-name {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.86rem;
+}
+
+.team-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 2px 7px;
+  color: var(--mut);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.swatch {
+  width: 9px; height: 9px; border-radius: 2px;
+  border: 1px solid rgba(255,255,255,0.25);
+  display: inline-block;
+}
+
+.count { color: var(--mut); font-family: var(--mono); font-size: 11px; }
+.svc-head-right { margin-left: auto; display: flex; gap: 8px; }
+
+table.terms { width: 100%; border-collapse: collapse; }
+table.terms th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--mut);
+  font-weight: 500;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+table.terms td {
+  padding: 3px 8px;
+  border-bottom: 1px solid #1b2723;
+  vertical-align: middle;
+}
+table.terms tr:last-child td { border-bottom: none; }
+table.terms tr:hover td { background: #0f1814; }
+
+col.c-id { width: 52px; }
+col.c-trigger { width: 26%; }
+col.c-tak { width: 26%; }
+col.c-act { width: 44px; }
+
+td.id {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mut);
+  padding-left: 12px;
+}
+
+/* Inputs sit flush in the cell so the table reads as a table, not a form,
+   until you click into it. */
+input.cell {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ink);
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 3px;
+}
+input.cell::placeholder { color: #4d5f57; }
+input.cell:hover { border-color: #22322b; }
+input.cell:focus {
+  outline: none;
+  border-color: var(--acc);
+  background: #0b120f;
+}
+input.cell.mono { font-family: var(--mono); font-size: 0.86rem; }
+input.cell.dirty { border-color: var(--warn); }
+
+.btn {
+  background: #16231d;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.86rem;
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--acc); color: var(--acc); }
+.btn:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.btn.primary { background: #16311f; border-color: #2c6a42; color: var(--acc); }
+.btn.small { padding: 3px 9px; font-size: 0.8rem; }
+.btn.danger:hover { border-color: var(--hot); color: var(--hot); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.x {
+  background: none;
+  border: none;
+  color: #46584f;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+.x:hover { color: var(--hot); background: #1d1513; }
+
+.newrow td { background: #0c1512; }
+
+.addsvc {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  margin-bottom: 26px;
+}
+.addsvc input, .addsvc select {
+  background: #0b120f;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  padding: 7px 9px;
+  border-radius: 3px;
+}
+.addsvc input:focus, .addsvc select:focus {
+  outline: none; border-color: var(--acc);
+}
+
+.note {
+  color: var(--mut);
+  font-size: 0.86rem;
+  margin: 0 0 18px;
+  max-width: 78ch;
+}
+.note code {
+  font-family: var(--mono);
+  background: #0f1814;
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  border-radius: 2px;
+  color: var(--ink);
+}
+
+.banner {
+  border: 1px solid var(--hot);
+  background: #1d1513;
+  color: var(--hot);
+  padding: 10px 14px;
+  border-radius: 3px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+.banner.ok { border-color: #2c6a42; background: #101d15; color: var(--acc); }
+
+.empty { color: var(--mut); padding: 14px; font-style: italic; }
+
+/* ---------- placeholder pages ---------- */
+
+.stub {
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  padding: 30px;
+  color: var(--mut);
+  max-width: 70ch;
+}
+.stub h2 { color: var(--ink); margin: 0 0 10px; font-size: 1.05rem; }
+.stub ul { margin: 12px 0 0; padding-left: 18px; }
+.stub li { margin-bottom: 6px; }
