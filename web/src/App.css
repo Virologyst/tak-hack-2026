@@ -19,6 +19,23 @@ h1 {
   font-size: 15px;
 }
 
+/* --- Error --- */
+.error {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .error {
+    background: #450a0a;
+    color: #fca5a5;
+  }
+}
+
 /* --- Add form --- */
 .add-form {
   display: flex;
