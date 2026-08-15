@@ -102,7 +102,8 @@ _(PROPOSAL)_
 - **Shape:** both — voice puts data onto the map, the engine reacts to the map
 - **Starting from:** `examples/04_geofence_alert.py` (sectors instead of one
   watch area, conflicts instead of breaches) + `examples/03_geochat_bot.py`
-- **Data source:** voice reports (Whisper on a Pi) + simulated agency asset feeds
+- **Data source:** 2-way radio audio into the laptop (USB adapter or line-in),
+  transcribed locally + simulated agency asset feeds
 - **What appears on the map:** sector polygons colour-coded by coverage,
   incident markers, and GeoChat alerts from a `DECONFLICT` bot
 

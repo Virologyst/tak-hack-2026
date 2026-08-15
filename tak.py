@@ -287,6 +287,24 @@ def cmd_selftest(args) -> int:
     check("geo helpers", round(geo.haversine(-27.47, 153.02, -27.48, 153.03)) == 1487,
           f"1487 m expected")
 
+    # Vocabulary: prove the Tak-word catalogue is still honest. A word here that
+    # no longer matches anything in interpret.py would be accepted into a
+    # dictionary and then build nothing, silently - so a regex edit that orphans
+    # one must fail a test rather than surface as an empty map at the venue.
+    from taklib.voice import takwords, vocab
+    dead = takwords.verify()
+    check("tak word catalogue", not dead,
+          f"{len(takwords.CATALOGUE)} terms" if not dead
+          else f"{len(dead)} dead: {dead[0]}")
+    v = vocab.Vocabulary(
+        [vocab.Term(1, None, "ambo", "ambulance"),
+         vocab.Term(2, "SAS", "fire", vocab.IGNORE),
+         vocab.Term(3, "FIRE", "fire", "fire")])
+    sas, _ = v.substitute("fire at the gate", "SAS")
+    fire, _ = v.substitute("fire at the gate", "FIRE")
+    check("per-service vocabulary", sas == "at the gate" and fire == "fire at the gate",
+          "same word, different service, different meaning")
+
     # 2. optional third-party bits
     for mod, why in (("pytak", "alternative sender"), ("takproto", "protobuf/v1 servers")):
         try:

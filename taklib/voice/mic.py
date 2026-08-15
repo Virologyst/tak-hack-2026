@@ -59,7 +59,7 @@ class MicCapture:
         self.sample_rate = int(sample_rate)
         # Digital gain, applied before the VAD sees anything. Needed when the
         # OS input level is low and you cannot raise it - a managed laptop, or
-        # a Pi with a cheap USB mic. It amplifies noise too, so prefer fixing
+        # a cheap USB audio adapter. It amplifies noise too, so prefer fixing
         # the input level when you actually can.
         self.gain = float(gain)
         # Scale each finished utterance to a sane level before it reaches the

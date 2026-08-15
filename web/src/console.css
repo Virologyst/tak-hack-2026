@@ -1,0 +1,710 @@
+/* TAK console styling.
+ *
+ * The palette is lifted verbatim from taklib/dashboard.py so the two screens
+ * match when they are side by side on a projector - the dashboard is the
+ * judge-facing map and this is the operator console, and them looking like one
+ * product costs nothing but is very visible.
+ *
+ * Deliberately not a framework. Three pages does not justify a dependency, and
+ * every npm package added is a lockfile conflict plus an install over
+ * contested venue wifi.
+ */
+
+:root {
+  --bg: #0d1411;
+  --panel: #131d19;
+  --line: #26362e;
+  --ink: #e6efe9;
+  --mut: #8fa89b;
+  --acc: #5fd08a;
+  --warn: #f2c14e;
+  --hot: #f0736a;
+  --blue: #79b8ff;
+  --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- shell ---------- */
+
+.shell { display: flex; flex-direction: column; height: 100%; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 52px;
+  padding: 0 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-right: 18px;
+  white-space: nowrap;
+}
+.brand span { color: var(--acc); }
+
+.tab {
+  background: none;
+  border: 1px solid transparent;
+  color: var(--mut);
+  font: inherit;
+  padding: 7px 14px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.tab:hover { color: var(--ink); background: #0b120f; }
+.tab.active {
+  color: var(--ink);
+  border-color: var(--line);
+  background: var(--bg);
+}
+.tab:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mut);
+}
+.dot { color: var(--acc); }
+.dot.bad { color: var(--hot); }
+
+.page { flex: 1; overflow-y: auto; padding: 22px 20px 60px; }
+.page-inner { max-width: 1180px; margin: 0 auto; }
+
+h1.page-title {
+  font-size: 1.3rem;
+  margin: 0 0 4px;
+  letter-spacing: -0.015em;
+}
+p.page-sub { margin: 0 0 22px; color: var(--mut); max-width: 74ch; }
+
+/* ---------- vocabulary tables ---------- */
+
+.listbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.svc {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  /* Tight when collapsed so the whole set reads as a list, roomier once open. */
+  margin-bottom: 6px;
+  background: var(--panel);
+  /* NOT overflow:hidden - it clipped the prediction dropdown at the card edge,
+     so suggestions for a row near the bottom were invisible. Rounded corners
+     are handled on the header instead. */
+  overflow: visible;
+}
+.svc.open { margin-bottom: 18px; }
+.svc.core { border-color: #35503f; }
+
+.svc-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 14px 4px 6px;
+  background: #0f1814;
+  border-radius: 3px 3px 0 0;
+}
+.svc:not(.open) .svc-head { border-radius: 3px; }
+.svc.open .svc-head { border-bottom: 1px solid var(--line); }
+
+/* The whole name/count block is the hit target - a bare caret is a tiny thing
+   to aim at, and this is used at speed. */
+.disclose {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.disclose:hover { background: #16231d; }
+.disclose:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+
+.caret {
+  color: var(--acc);
+  font-size: 11px;
+  width: 12px;
+  flex: none;
+}
+
+.svc-name {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.86rem;
+}
+
+.team-chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 2px 7px;
+  color: var(--mut);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.swatch {
+  width: 9px; height: 9px; border-radius: 2px;
+  border: 1px solid rgba(255,255,255,0.25);
+  display: inline-block;
+}
+
+.count { color: var(--mut); font-family: var(--mono); font-size: 11px; }
+.svc-head-right { margin-left: auto; display: flex; gap: 8px; }
+
+table.terms { width: 100%; border-collapse: collapse; }
+table.terms th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--mut);
+  font-weight: 500;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+table.terms td {
+  padding: 3px 8px;
+  border-bottom: 1px solid #1b2723;
+  vertical-align: middle;
+}
+table.terms tr:last-child td { border-bottom: none; }
+table.terms tr:hover td { background: #0f1814; }
+
+col.c-id { width: 52px; }
+col.c-trigger { width: 26%; }
+col.c-tak { width: 26%; }
+col.c-act { width: 44px; }
+
+td.id {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mut);
+  padding-left: 12px;
+}
+
+/* Inputs sit flush in the cell so the table reads as a table, not a form,
+   until you click into it. */
+input.cell {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ink);
+  font: inherit;
+  padding: 6px 8px;
+  border-radius: 3px;
+}
+input.cell::placeholder { color: #4d5f57; }
+input.cell:hover { border-color: #22322b; }
+input.cell:focus {
+  outline: none;
+  border-color: var(--acc);
+  background: #0b120f;
+}
+input.cell.mono { font-family: var(--mono); font-size: 0.86rem; }
+input.cell.dirty { border-color: var(--warn); }
+
+.btn {
+  background: #16231d;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.86rem;
+  padding: 6px 12px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--acc); color: var(--acc); }
+.btn:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.btn.primary { background: #16311f; border-color: #2c6a42; color: var(--acc); }
+.btn.small { padding: 3px 9px; font-size: 0.8rem; }
+.btn.danger:hover { border-color: var(--hot); color: var(--hot); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.x {
+  background: none;
+  border: none;
+  color: #46584f;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+.x:hover { color: var(--hot); background: #1d1513; }
+
+.newrow td { background: #0c1512; }
+
+/* ---------- tak word prediction ---------- */
+
+.takcell { position: relative; }
+
+/* Red the instant the text stops being a real term - not on blur, because
+   finding out after you have moved on is finding out too late. */
+input.cell.invalid {
+  border-color: var(--hot);
+  color: var(--hot);
+}
+
+.predict {
+  position: absolute;
+  /* Above everything: the table, the next service card, and the sticky bits.
+     A suggestion list you cannot read is worse than none, because you act on
+     the half of it you can see. */
+  z-index: 500;
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 420px;
+  max-width: 560px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 3px;
+  list-style: none;
+  /* Fully opaque, not a tint of the panel - it sits over table rows and any
+     transparency makes the text underneath bleed through and fight it. */
+  background: #050908;
+  border: 1px solid var(--acc);
+  border-radius: 3px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+}
+
+/* Flipped above the field when there is no room below - which is the common
+   case, because the row you type into most is the new-term row at the bottom
+   of the table. */
+.predict.above {
+  top: auto;
+  bottom: calc(100% + 2px);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.85);
+}
+
+/* Highlight the part of the word that matched what was typed - the match can
+   be anywhere in the term, so without this it is not obvious why a suggestion
+   is in the list at all. */
+.predict mark {
+  background: none;
+  color: var(--acc);
+  font-weight: 700;
+}
+.predict li { margin: 0; }
+.predict button {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  padding: 6px 9px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.predict button:hover, .predict button:focus-visible {
+  background: #16231d;
+  outline: none;
+}
+.predict .pw {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.predict .pc {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 1px 5px;
+  color: var(--mut);
+  flex: none;
+}
+.predict .pc.intent    { color: var(--acc);  border-color: #2c6a42; }
+.predict .pc.agency    { color: var(--blue); border-color: #2f4d6e; }
+.predict .pc.priority  { color: var(--hot);  border-color: #6b3733; }
+.predict .pc.casualty  { color: var(--warn); border-color: #6a5620; }
+.predict .pc.control   { color: var(--warn); border-color: #6a5620; }
+.predict .pe {
+  color: var(--mut);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+tr.bad td { background: #1d1513; }
+
+/* A brief green pulse on the id when a field saves. The only save feedback
+   there is, since there is no save button to give any - it has to be visible
+   without being something you must look at. */
+@keyframes savedflash {
+  from { color: var(--acc); }
+  to   { color: var(--mut); }
+}
+.flash { animation: savedflash 900ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .flash { animation: none; color: var(--acc); }
+}
+
+.addsvc {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  margin-bottom: 26px;
+}
+.addsvc input, .addsvc select {
+  background: #0b120f;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  padding: 7px 9px;
+  border-radius: 3px;
+}
+.addsvc input:focus, .addsvc select:focus {
+  outline: none; border-color: var(--acc);
+}
+
+.note {
+  color: var(--mut);
+  font-size: 0.86rem;
+  margin: 0 0 18px;
+  max-width: 78ch;
+}
+.note code {
+  font-family: var(--mono);
+  background: #0f1814;
+  border: 1px solid var(--line);
+  padding: 1px 5px;
+  border-radius: 2px;
+  color: var(--ink);
+}
+
+.banner {
+  border: 1px solid var(--hot);
+  background: #1d1513;
+  color: var(--hot);
+  padding: 10px 14px;
+  border-radius: 3px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
+.banner.ok { border-color: #2c6a42; background: #101d15; color: var(--acc); }
+.banner.warn {
+  border-color: var(--warn);
+  background: #1c1810;
+  color: var(--warn);
+  margin: 10px 14px 0;
+}
+.banner.warn strong { color: var(--ink); }
+.banner.warn code {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  background: #0b120f;
+  border: 1px solid var(--line);
+  padding: 2px 6px;
+  border-radius: 2px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.empty { color: var(--mut); padding: 14px; font-style: italic; }
+
+/* ---------- live console ---------- */
+
+.page.nopad { padding: 0; overflow: hidden; }
+
+.live { display: flex; flex-direction: column; height: 100%; }
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  flex: none;
+  flex-wrap: wrap;
+}
+.controls select, .controls input {
+  background: #0b120f;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.86rem;
+  padding: 5px 8px;
+  border-radius: 3px;
+}
+.controls select:focus, .controls input:focus {
+  outline: none; border-color: var(--acc);
+}
+.ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--mut);
+}
+.controls-right { margin-left: auto; display: flex; gap: 8px; }
+.say { min-width: 300px; }
+
+.estate {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mut);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 3px 8px;
+}
+.estate.running { color: var(--acc); border-color: #2c6a42; }
+.estate.error   { color: var(--hot); border-color: #6b3733; }
+.estate.loading, .estate.starting { color: var(--warn); border-color: #6a5620; }
+
+/* Three equal columns. On a narrow screen they stack rather than shrink into
+   unreadable slivers - the XML pane in particular needs its width. */
+.panes {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--line);
+  min-height: 0;
+}
+@media (max-width: 1080px) {
+  .panes { grid-template-columns: 1fr; overflow-y: auto; }
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  min-height: 0;
+  min-width: 0;
+}
+.pane > header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 13px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mut);
+  flex: none;
+}
+.pcount {
+  margin-left: auto;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 1px 6px;
+  color: var(--mut);
+}
+.pcount.sent { color: var(--acc); border-color: #2c6a42; }
+
+.pane-body { flex: 1; overflow-y: auto; padding: 12px 13px; min-height: 0; }
+.pane-body.list { padding: 4px; }
+
+.heard {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--ink);
+  font: inherit;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+.heard:hover { background: var(--panel); }
+.heard.on { background: var(--panel); border-color: var(--acc); }
+.hid { font-family: var(--mono); font-size: 10px; color: var(--mut); flex: none; }
+.htext { flex: 1; font-size: 0.9rem; }
+.hmeta { font-family: var(--mono); font-size: 10px; color: var(--mut); flex: none; }
+.hmeta em { font-style: normal; }
+.hmeta .ok { color: var(--acc); }
+.hmeta .no { color: var(--mut); }
+
+.sanitised {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin: 0 0 12px;
+}
+.rawline {
+  font-size: 0.82rem;
+  color: var(--mut);
+  margin: 0 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.hit {
+  color: var(--acc);
+  border-bottom: 1px dotted var(--acc);
+  cursor: help;
+}
+.hit.shadow { color: var(--warn); border-bottom-color: var(--warn); }
+
+.report { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 14px; }
+.rfield { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; }
+.rk {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--mut);
+  min-width: 62px;
+}
+.rv { font-family: var(--mono); font-size: 0.85rem; }
+.rv.dim { color: #4d5f57; }
+
+.xml {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 10px;
+  margin: 0;
+  color: #b9d6c6;
+}
+.wire {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--acc);
+  margin: 9px 0 0;
+}
+
+/* The one string that says nothing was built. Deliberately calm - it is the
+   normal outcome for most radio chatter, not an error. */
+.nocot {
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  color: var(--mut);
+  border: 1px dashed var(--line);
+  border-radius: 3px;
+  padding: 16px;
+  text-align: center;
+  margin: 0;
+}
+
+/* ---------- placeholder pages ---------- */
+
+.stub {
+  border: 1px dashed var(--line);
+  border-radius: 4px;
+  padding: 30px;
+  color: var(--mut);
+  max-width: 70ch;
+}
+.stub h2 { color: var(--ink); margin: 0 0 10px; font-size: 1.05rem; }
+.stub ul { margin: 12px 0 0; padding-left: 18px; }
+.stub li { margin-bottom: 6px; }
+
+/* ---------- pane cascade ----------
+ *
+ * A transmission sweeps the pane HEADERS left to right: heard, then what we
+ * made of it, then what went on the wire. It shows the direction of travel to
+ * somebody watching over a shoulder.
+ *
+ * The content itself never animates, and that is the whole lesson here. Two
+ * earlier versions dimmed the pane bodies - first with a React stage counter,
+ * then with a keyed CSS animation - and both failed the same way under real
+ * traffic: utterances about a second apart restarted the sequence before it
+ * finished, leaving the Cursor-on-Target pane sitting at quarter opacity
+ * during exactly the traffic the console exists for. An animation that can
+ * make the answer unreadable is not a nice touch, it is a fault. So the
+ * decoration lives on the header and the text is always at full strength.
+ */
+
+.panes .pane > header {
+  position: relative;
+  overflow: hidden;
+}
+
+.panes .pane > header::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: var(--acc);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.panes .pane.pulse > header::after {
+  animation: sweep 520ms ease-out;
+}
+.panes .p1.pulse > header::after { animation-delay: 0ms; }
+.panes .p2.pulse > header::after { animation-delay: 150ms; }
+.panes .p3.pulse > header::after { animation-delay: 300ms; }
+
+@keyframes sweep {
+  0%   { transform: scaleX(0); opacity: 1; }
+  55%  { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* The newest row in Heard, which is now the TOP one. */
+.heard.fresh { animation: heardIn 320ms ease-out; }
+
+@keyframes heardIn {
+  from { opacity: 0; transform: translateY(-6px); background: #16311f; }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panes .pane.pulse > header::after,
+  .heard.fresh { animation: none; }
+}

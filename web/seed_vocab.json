@@ -1,0 +1,207 @@
+{
+  "_comment": "Starter vocabulary. Tracked as TEXT so two people editing it produces a merge conflict a human can resolve, rather than a binary .db conflict that loses one side's work. Loaded by schema.migrate() only when the terms table is empty - editing this file does not affect a database that already has terms in it.",
+  "services": [
+    {
+      "name": "CORE",
+      "team": "White",
+      "sort_order": 0,
+      "terms": [
+        {
+          "trigger": "mayday",
+          "tak_word": "mayday",
+          "comments": "migrated from category=emergency"
+        },
+        {
+          "trigger": "officer down",
+          "tak_word": "officer down",
+          "comments": "migrated from category=emergency"
+        },
+        {
+          "trigger": "on scene",
+          "tak_word": "on scene",
+          "comments": "migrated from category=status"
+        },
+        {
+          "trigger": "requesting backup",
+          "tak_word": "requesting backup",
+          "comments": "migrated from category=request"
+        },
+        {
+          "trigger": "all clear",
+          "tak_word": "all clear",
+          "comments": "migrated from category=status"
+        },
+        {
+          "trigger": "crowd surge",
+          "tak_word": "",
+          "comments": "no TAK term - kept so the recogniser is biased to hear it"
+        },
+        {
+          "trigger": "we're here",
+          "tak_word": "on scene",
+          "comments": ""
+        },
+        {
+          "trigger": "were here",
+          "tak_word": "on scene",
+          "comments": "recogniser often drops the apostrophe"
+        },
+        {
+          "trigger": "in position",
+          "tak_word": "on scene",
+          "comments": ""
+        },
+        {
+          "trigger": "arrived",
+          "tak_word": "on scene",
+          "comments": ""
+        },
+        {
+          "trigger": "en route",
+          "tak_word": "responding",
+          "comments": ""
+        },
+        {
+          "trigger": "enroute",
+          "tak_word": "responding",
+          "comments": ""
+        },
+        {
+          "trigger": "on our way",
+          "tak_word": "responding",
+          "comments": ""
+        },
+        {
+          "trigger": "tied up",
+          "tak_word": "unavailable",
+          "comments": ""
+        },
+        {
+          "trigger": "out of service",
+          "tak_word": "unavailable",
+          "comments": ""
+        },
+        {
+          "trigger": "back in service",
+          "tak_word": "clear",
+          "comments": ""
+        }
+      ]
+    },
+    {
+      "name": "POLICE",
+      "team": "Blue",
+      "sort_order": 10,
+      "terms": [
+        {
+          "trigger": "ka",
+          "tak_word": "police",
+          "comments": "local callsign prefix"
+        },
+        {
+          "trigger": "unit",
+          "tak_word": "police",
+          "comments": ""
+        },
+        {
+          "trigger": "code one",
+          "tak_word": "emergency",
+          "comments": ""
+        }
+      ]
+    },
+    {
+      "name": "AMBULANCE",
+      "team": "Green",
+      "sort_order": 20,
+      "terms": [
+        {
+          "trigger": "ambo",
+          "tak_word": "ambulance",
+          "comments": ""
+        },
+        {
+          "trigger": "paramedic",
+          "tak_word": "ambulance",
+          "comments": ""
+        },
+        {
+          "trigger": "pt",
+          "tak_word": "patient",
+          "comments": "spoken as 'P T'"
+        },
+        {
+          "trigger": "load and go",
+          "tak_word": "patient",
+          "comments": "a patient is being moved; the count drives the CASEVAC"
+        }
+      ]
+    },
+    {
+      "name": "FIRE",
+      "team": "Red",
+      "sort_order": 30,
+      "terms": [
+        {
+          "trigger": "fire",
+          "tak_word": "fire incident",
+          "comments": "for firefighters 'fire' is the incident - contrast SAS"
+        },
+        {
+          "trigger": "pumper",
+          "tak_word": "fire",
+          "comments": ""
+        },
+        {
+          "trigger": "brigade",
+          "tak_word": "fire",
+          "comments": ""
+        }
+      ]
+    },
+    {
+      "name": "SAS",
+      "team": "Dark Green",
+      "sort_order": 40,
+      "terms": [
+        {
+          "trigger": "fire",
+          "tak_word": "(ignore)",
+          "comments": "SAS 'fire' means shoot - it must NOT create a fire-service marker, so the word is deleted rather than mapped"
+        },
+        {
+          "trigger": "contact",
+          "tak_word": "sighted",
+          "comments": "contact report becomes a sighting ('sighting' matches nothing; 'sighted' does)"
+        }
+      ]
+    },
+    {
+      "name": "SES",
+      "team": "Orange",
+      "sort_order": 50,
+      "terms": [
+        {
+          "trigger": "state emergency",
+          "tak_word": "ses",
+          "comments": ""
+        },
+        {
+          "trigger": "rescue",
+          "tak_word": "ses",
+          "comments": ""
+        },
+        {
+          "trigger": "sar",
+          "tak_word": "ses",
+          "comments": ""
+        },
+        {
+          "trigger": "moving",
+          "tak_word": "proceeding",
+          "comments": ""
+        }
+      ]
+    }
+  ]
+}

@@ -15,6 +15,23 @@ certs/
 
 # --- node / web -------------------------------------------------------------
 node_modules/
+web/dist/
+
+# --- local databases ---------------------------------------------------------
+# triggers.db is runtime state, not source. It was tracked, and that was going
+# to hurt: it is binary so two people editing vocabulary get an unmergeable
+# conflict; merely opening it dirties `git status`, so people reflexively
+# `git checkout --` it and silently discard terms the team just typed; and a
+# committed stale -wal can be REPLAYED against a different generation of the
+# .db, which is data loss rather than merge noise.
+#
+# Nothing is lost by ignoring it. Both layers rebuild from source on first run:
+# db.py::init() restores the trigger phrases, and schema.py::migrate() creates
+# the vocabulary tables and seeds them from the tracked, diffable
+# web/seed_vocab.json.
+web/*.db
+web/*.db-wal
+web/*.db-shm
 
 # --- python -----------------------------------------------------------------
 __pycache__/

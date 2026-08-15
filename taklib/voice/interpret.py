@@ -8,8 +8,9 @@ Three layers, deliberately in this order:
 2. **LLM** (`LLMInterpreter`) - optional. Talks to a local Ollama over plain
    `urllib`, so it adds no pip dependency. Use it to rescue sentences the rules
    miss.
-3. **Direct** - if the STT backend can go audio->JSON itself (phi4), skip
-   straight to that. `understand()` handles the choice.
+3. **Direct** - if a backend can go audio->JSON itself, skip straight to
+   that. `understand()` handles the choice; moonshine cannot, so today this
+   path is never taken.
 
 **Rules run first on purpose.** A demo that dies because a 1.7B model got
 creative at 3am is a bad demo. The LLM enriches; it is never load-bearing.
@@ -61,8 +62,13 @@ INTENT_PATTERNS = (
     ("on_scene",        r"\b(on scene|onscene|arrived|at location|we'?re here|in position)\b"),
     ("responding",      r"\b(responding|en route|enroute|on our way|proceeding|attending)\b"),
     ("request_support", r"\b(request(ing)?|need|require|send|backup|assistance|support)\b"),
-    ("casualty_report", r"\b(patient|casualt|injur|victim|wounded|cpr|unconscious)\b"),
-    ("sighting",        r"\b(sighted|observ|spotted|visual on|contact with)\b"),
+    # The stems here MUST carry \w*, not a bare \b. `casualt` inside \b...\b
+    # only matches the literal string "casualt", which nobody says - so
+    # "casualties" and "injured" fell through to intent=other while looking
+    # perfectly well handled. Found by takwords.verify(), which is exactly the
+    # job it exists to do.
+    ("casualty_report", r"\b(patients?|casualt\w*|injur\w*|victims?|wounded|cpr|unconscious)\b"),
+    ("sighting",        r"\b(sighted|observ\w*|spotted|visual on|contact with)\b"),
 )
 
 PRIORITY_PATTERNS = (
@@ -99,21 +105,41 @@ DEFAULT_KEYTERMS = (
 )
 
 
-def interpret_text(text: str) -> Dict:
+def interpret_text(text: str, *, vocab=None, service: Optional[str] = None) -> Dict:
     """Rules-only extraction. Always returns a dict; never raises.
+
+    Pass a `Vocabulary` and a service name and the service's jargon is
+    substituted for its tak words FIRST, then the existing patterns run over
+    the rewritten text. That ordering is the whole trick: `INTENT_PATTERNS`,
+    `AGENCY_WORDS`, `UNIT_RE` and the rest are untouched, because substitution
+    maps what a team says onto the canonical words the rules already know. Add
+    a term to a dictionary and the pipeline understands it with no code change.
+
+    Without a vocabulary this behaves exactly as it always did, so examples 06
+    and 07 keep working unchanged.
 
     `confidence` is deliberately crude - it counts how many fields we actually
     resolved. Use it to decide whether to bother the LLM, not as a probability.
     """
     raw = (text or "").strip()
-    low = raw.lower()
+    sanitised, hits = raw, []
+    if vocab is not None:
+        sanitised, hits = vocab.substitute(raw, service)
+
+    low = sanitised.lower()
     out: Dict = {
-        "text": raw, "intent": "other", "agency": "unknown", "unit": None,
+        "text": raw, "sanitised": sanitised,
+        "hits": [h.as_dict() for h in hits],
+        "service": service,
+        "intent": "other", "agency": "unknown", "unit": None,
         "count": None, "location": None, "priority": "routine",
         "source": "rules",
     }
     if not raw:
         return dict(out, confidence=0.0)
+    # Everything below reads `sanitised`, not `raw` - matching what the
+    # vocabulary produced rather than what was said.
+    raw = sanitised
 
     for agency, words in AGENCY_WORDS.items():
         if any(re.search(r"\b%s" % re.escape(w), low) for w in words):
@@ -222,7 +248,7 @@ def understand(samples: Sequence[float], sample_rate: int, stt,
                llm: Optional[LLMInterpreter] = None) -> Dict:
     """Audio to a structured report, by whatever route this backend supports.
 
-    Order: the backend's own audio->JSON if it has one (phi4), otherwise
+    Order: the backend's own audio->JSON if it has one, otherwise
     transcribe and run the rules, optionally topped up by the LLM when the
     rules came back thin.
     """
@@ -267,6 +293,36 @@ def _normalise(report: Dict) -> Dict:
     unit = out.get("unit")
     out["unit"] = str(unit).upper() if unit else None
     return out
+
+
+#: The exact words shown when a transmission produces no CoT. One string, in
+#: one place, decided by the server - the browser must never synthesise it from
+#: `cot is None`, or the wording drifts and the reason can never improve.
+NOT_A_COMMAND = "Not detected as a Tak command entry"
+
+
+def constructable(report: Dict, hits: Sequence = ()) -> "tuple[bool, str]":
+    """Should this become a CoT event at all? Returns (yes, reason-if-not).
+
+    This gate has to exist because `to_cot()` never declines - it falls through
+    to a marker for "UNKNOWN". Fine when a human chose to send something;
+    disastrous on a radio feed, where every cough and half-sentence would carpet
+    the map with unknown markers and bury the real traffic.
+
+    Emit when a unit resolved (there is something identifiable to put on the
+    map), or when a real intent was found AND the vocabulary actually matched
+    something (so the operator's own dictionary vouches for it). Chatter that
+    satisfies neither is reported as heard and nothing is sent.
+    """
+    if not (report.get("text") or "").strip():
+        return False, NOT_A_COMMAND
+    if report.get("unit"):
+        return True, ""
+    if report.get("intent", "other") != "other" and len(hits) > 0:
+        return True, ""
+    if report.get("priority") == "emergency":
+        return True, ""          # never swallow a mayday for want of a callsign
+    return False, NOT_A_COMMAND
 
 
 def to_cot(report: Dict, lat: float, lon: float, *, uid_prefix: str,

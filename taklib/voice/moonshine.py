@@ -11,8 +11,9 @@ so nobody rediscovers these at 3am:
 - Models download from a CDN on first use into a per-user cache, *not* into the
   package. Run once on good wifi before the venue or you will be pulling
   ~15 MB over contested conference wifi.
-- Measured ~1.5x realtime on a laptop CPU with `medium-streaming-en`. A Pi will
-  be slower - measure before betting the demo on one.
+- Measured on a Core Ultra 7, same 3.0s clip, interleaved: TINY_STREAMING
+  1.10s (2.7x realtime), MEDIUM_STREAMING 2.35s (1.3x). Same accuracy, so the
+  bigger model buys nothing. CPU only - moonshine does not use the GPU.
 - Spoken numbers come out as digits ("gate four" -> "Gate 4"), which is exactly
   what you want for callsigns and grids.
 """

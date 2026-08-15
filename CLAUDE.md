@@ -97,8 +97,9 @@ proves the interpret pipeline without needing a mic or speech model.
 
 `taklib` core is **pure standard library**. `taklib.voice` imports its
 dependencies lazily — `import taklib` stays dependency-free. Speech backend:
-**moonshine** (15 MB, ~1.5x realtime on CPU). Phi-4-multimodal was tested and
-rejected (see `taklib/voice/phi4.py`).
+**moonshine**, and only moonshine (~30 MB, 2.8x realtime on TINY_STREAMING).
+whisper and Phi-4-multimodal were tested and removed - write-ups in
+`docs/PROBLEM.md`, code and weights deliberately not in the repo.
 
 ## Writing CoT
 
