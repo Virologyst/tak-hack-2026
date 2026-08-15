@@ -22,7 +22,23 @@ from typing import Dict, List, Optional
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import schema  # noqa: E402  (sibling module, same directory)
+from taklib.voice import takwords  # noqa: E402
 from taklib.voice.vocab import Vocabulary, from_rows  # noqa: E402
+
+
+class InvalidTakWord(ValueError):
+    """A tak word that builds nothing. Carries suggestions so the UI can help."""
+
+    def __init__(self, word: str):
+        self.word = word
+        self.suggestions = takwords.suggest(word)
+        hint = (" Did you mean: %s?" % ", ".join(self.suggestions)
+                if self.suggestions else
+                " Leave it blank if this word has no TAK meaning, or use "
+                "(ignore) to delete it from the transcript.")
+        super().__init__(
+            "'%s' is not a TAK term - it would build nothing and fail "
+            "silently.%s" % (word, hint))
 
 TERM_SQL = """
 SELECT t.id, s.name AS service, t.trigger, t.tak_word, t.comments, t.service_id
@@ -165,12 +181,15 @@ class VocabStore:
         trigger = (trigger or "").strip()
         if not trigger:
             return None
+        tak_word = (tak_word or "").strip()
+        if not takwords.is_valid(tak_word):
+            raise InvalidTakWord(tak_word)
         conn = self.connect()
         try:
             cur = conn.execute(
                 "INSERT INTO terms (service_id, trigger, tak_word, comments) "
                 "VALUES (?,?,?,?)",
-                (service_id, trigger, (tak_word or "").strip(), comments or ""))
+                (service_id, trigger, tak_word, comments or ""))
             conn.commit()
             schema.bump_revision(conn)
             return self._get_term(conn, cur.lastrowid)
@@ -186,6 +205,10 @@ class VocabStore:
         sets = {k: v for k, v in fields.items() if k in allowed}
         if not sets:
             return None
+        if "tak_word" in sets:
+            sets["tak_word"] = (sets["tak_word"] or "").strip()
+            if not takwords.is_valid(sets["tak_word"]):
+                raise InvalidTakWord(sets["tak_word"])
         conn = self.connect()
         try:
             conn.execute(

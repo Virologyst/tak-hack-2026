@@ -16,9 +16,19 @@ production.
 
 **Two servers, one database.** If Craig's `api.py` is also running, both write
 `triggers.db`. That is fine - the vocabulary revision lives in the `meta` table
-rather than in memory precisely so neither process can hold a stale view. What
-is NOT fine is both binding 5001, so this defaults to the same port on purpose:
-you find out immediately rather than wondering why the other page is dead.
+rather than in memory precisely so neither process can hold a stale view.
+
+**But two servers on one PORT is not fine, and Windows will not tell you.**
+`HTTPServer` sets `allow_reuse_address`, which on Windows means SO_REUSEADDR
+lets a second process bind a port that is already listening. No "address in
+use" error is raised; the two sockets simply split incoming connections
+between them at random. The symptom is a page that works, then does not, then
+does again - and an API that appears to ignore code you just changed, because
+half your requests are being answered by the older process.
+
+Observed while building this: two `app.py` instances listening on 5001 at once,
+and curl getting the stale one. `netstat -ano | grep :5001` shows more than one
+LISTENING line when it happens. Kill by PID; a plain pkill may only get one.
 """
 
 from __future__ import annotations
@@ -28,6 +38,7 @@ import json
 import mimetypes
 import os
 import posixpath
+import socket
 import sys
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -37,8 +48,9 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
 import schema                       # noqa: E402
-from vocab_store import VocabStore  # noqa: E402
+from vocab_store import InvalidTakWord, VocabStore  # noqa: E402
 from taklib import types as tak_types  # noqa: E402
+from taklib.voice import takwords    # noqa: E402
 
 STORE = VocabStore()
 STATIC_DIR = os.path.join(HERE, "dist")
@@ -98,6 +110,19 @@ class Handler(BaseHTTPRequestHandler):
             sid = qs.get("service_id", [None])[0]
             return self._send(200, {"terms": STORE.list_terms(
                 int(sid) if sid else None)})
+        if path == "/api/takwords":
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            q = qs.get("q", [""])[0]
+            limit = int(qs.get("limit", ["12"])[0])
+            if q:
+                return self._send(200, {"words": [
+                    {"word": w.word, "category": w.category, "effect": w.effect}
+                    for w in takwords.search(q, limit)]})
+            # No query: the whole catalogue, so the page can validate offline
+            # and never has to round-trip on a keystroke.
+            return self._send(200, {"words": takwords.as_dicts(),
+                                    "ignore": takwords.IGNORE})
+
         if path == "/api/vocab":
             return self._send(200, STORE.export_json())
         if path.startswith("/api/"):
@@ -122,9 +147,13 @@ class Handler(BaseHTTPRequestHandler):
                 service_id = int(body.get("service_id", schema.CORE_SERVICE_ID))
             except (TypeError, ValueError):
                 return self._send(400, {"error": "service_id must be a number"})
-            term = STORE.add_term(service_id, body.get("trigger", ""),
-                                  body.get("tak_word", ""),
-                                  body.get("comments", ""))
+            try:
+                term = STORE.add_term(service_id, body.get("trigger", ""),
+                                      body.get("tak_word", ""),
+                                      body.get("comments", ""))
+            except InvalidTakWord as bad:
+                return self._send(422, {"error": str(bad),
+                                        "suggestions": bad.suggestions})
             if term is None:
                 return self._send(409, {
                     "error": "empty trigger, or that trigger already exists in "
@@ -145,7 +174,11 @@ class Handler(BaseHTTPRequestHandler):
         body = self._body()
 
         if len(parts) == 4 and parts[2] == "terms":
-            term = STORE.update_term(int(parts[3]), **body)
+            try:
+                term = STORE.update_term(int(parts[3]), **body)
+            except InvalidTakWord as bad:
+                return self._send(422, {"error": str(bad),
+                                        "suggestions": bad.suggestions})
             if term is None:
                 return self._send(409, {"error": "nothing to change, or that "
                                                  "trigger already exists here"})
@@ -223,6 +256,8 @@ def main() -> int:
                     help="0.0.0.0 to reach it from another device on the LAN")
     ap.add_argument("--port", type=int, default=5001)
     ap.add_argument("--db", help="override the sqlite path")
+    ap.add_argument("--force", action="store_true",
+                    help="start even if the port already answers")
     ap.add_argument("--no-seed", action="store_true",
                     help="skip the starter vocabulary on a fresh database")
     args = ap.parse_args()
@@ -241,6 +276,24 @@ def main() -> int:
     for svc in STORE.list_services():
         print("  %-12s %-11s %2d terms"
               % (svc["name"], svc["team"], svc["term_count"]))
+
+    # Refuse to start if something already answers on this port. Windows will
+    # happily let a second process bind it (SO_REUSEADDR), then split requests
+    # between the two at random - so you edit code, restart, and half your
+    # calls are still served by the old process. Bind order gives no error, so
+    # this probe is the only thing that catches it.
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.settimeout(0.4)
+    already = probe.connect_ex(("127.0.0.1", args.port)) == 0
+    probe.close()
+    if already and not args.force:
+        print("ERROR: something is already listening on port %d." % args.port)
+        print("  Windows allows a second bind and then splits traffic between")
+        print("  them, which looks like your code changes being ignored.")
+        print("  Find it:  netstat -ano | findstr :%d" % args.port)
+        print("  Or start elsewhere:  --port %d" % (args.port + 1))
+        print("  Or override:  --force")
+        return 1
 
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     shown = "127.0.0.1" if args.host in ("0.0.0.0", "") else args.host

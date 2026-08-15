@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 
 // ATAK renders these team names as distinct colours on the map, so the swatch
 // here is a genuine preview of what an operator will see - not decoration.
@@ -19,175 +19,301 @@ const api = async (path, opts) => {
   return body
 }
 
-/* One editable cell. Commits on blur or Enter, reverts on Escape.
-   No save button anywhere: at hackathon pace, people type and move on, and a
-   row that needed an extra click would silently lose edits. */
-function Cell({ value, placeholder, mono, onCommit }) {
-  const [draft, setDraft] = useState(value ?? '')
-  useEffect(() => { setDraft(value ?? '') }, [value])
-  const dirty = draft !== (value ?? '')
+let keySeq = 0
+const blankRow = () => ({
+  key: `r${++keySeq}`, id: null, trigger: '', tak_word: '', comments: '',
+  saving: false, saved: false, error: '',
+})
+const toRow = (t) => ({
+  key: `r${++keySeq}`, id: t.id, trigger: t.trigger, tak_word: t.tak_word,
+  comments: t.comments, saving: false, saved: false, error: '',
+})
 
-  const commit = () => { if (dirty) onCommit(draft) }
-
-  return (
-    <input
-      className={`cell${mono ? ' mono' : ''}${dirty ? ' dirty' : ''}`}
-      value={draft}
-      placeholder={placeholder}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') { e.currentTarget.blur() }
-        if (e.key === 'Escape') { setDraft(value ?? ''); e.currentTarget.blur() }
-      }}
-    />
-  )
-}
-
-function ServiceTable({ service, terms, teams, onChanged, onError }) {
-  const [newTrigger, setNewTrigger] = useState('')
-  const [newTak, setNewTak] = useState('')
-  const [newComments, setNewComments] = useState('')
+/* A table that behaves like a spreadsheet.
+ *
+ * Two rules drive the whole design:
+ *
+ *  - Typing the first character of a trigger CREATES the row immediately, and
+ *    a fresh blank row appears beneath it. No Add button.
+ *  - Leaving any field saves it. No Save button.
+ *
+ * Both mean the list must never be re-fetched mid-edit. A refetch re-renders
+ * the table, React swaps the DOM nodes, and the caret jumps out of the field
+ * the operator is typing into - which is exactly the thing that must not
+ * happen. So local state owns the rows after the first load, and every
+ * mutation patches that state in place from the server's own response.
+ *
+ * React keys stay stable for a row's whole life (`r7` before it is saved and
+ * after), so acquiring a database id never remounts the input and never costs
+ * focus.
+ */
+function ServiceTable({ service, initialTerms, teams, onError, onDeleted,
+                       openAll, onCount, catalogue }) {
+  const [open, setOpen] = useState(false)
+  const [rows, setRows] = useState(() => [...initialTerms.map(toRow), blankRow()])
   const isCore = !!service.is_core
+  // Edits made while a create is still in flight - flushed when the id lands.
+  const pending = useRef({})
 
-  const addTerm = async () => {
-    if (!newTrigger.trim()) return
+  useEffect(() => { if (openAll !== null) setOpen(openAll.value) }, [openAll])
+
+  const saved = rows.filter((r) => r.id !== null)
+  useEffect(() => { onCount(service.id, saved.length) }, [saved.length])
+
+  const patchRow = (key, changes) =>
+    setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...changes } : r)))
+
+  const flash = (key) => {
+    patchRow(key, { saved: true, error: '' })
+    setTimeout(() => patchRow(key, { saved: false }), 900)
+  }
+
+  /* First keystroke in an unsaved row's trigger: create it now. */
+  const createRow = async (row, trigger) => {
+    patchRow(row.key, { saving: true, error: '' })
+    // The blank row appears immediately, not after the round trip, so the
+    // table never visibly stalls while the network is slow.
+    setRows((rs) => (rs.some((r) => r.id === null && r.key !== row.key)
+      ? rs : [...rs, blankRow()]))
     try {
-      await api('/api/terms', {
+      const created = await api('/api/terms', {
         method: 'POST',
         body: JSON.stringify({
-          service_id: service.id, trigger: newTrigger,
-          tak_word: newTak, comments: newComments,
+          service_id: service.id, trigger,
+          tak_word: row.tak_word, comments: row.comments,
         }),
       })
-      setNewTrigger(''); setNewTak(''); setNewComments('')
-      onChanged()
-    } catch (e) { onError(e.message) }
+      const late = pending.current[row.key]
+      delete pending.current[row.key]
+      patchRow(row.key, { id: created.id, saving: false })
+      flash(row.key)
+      // Anything typed while the POST was in flight.
+      if (late) {
+        for (const [field, value] of Object.entries(late)) {
+          await api(`/api/terms/${created.id}`, {
+            method: 'PATCH', body: JSON.stringify({ [field]: value }),
+          }).catch(() => {})
+        }
+      }
+    } catch (e) {
+      patchRow(row.key, { saving: false, error: e.message })
+      onError(e.message)
+    }
   }
 
-  const patch = async (id, field, value) => {
+  const commit = async (row, field, value) => {
+    if (value === row[field]) return
+    patchRow(row.key, { [field]: value })
+
+    if (row.id === null) {
+      if (field === 'trigger' && value.trim()) return createRow(row, value)
+      // Typed into tak/comments before the trigger exists: hold it locally and
+      // it goes up with the create. Nothing to save yet - an empty trigger is
+      // not a term.
+      if (row.saving) pending.current[row.key] = {
+        ...(pending.current[row.key] || {}), [field]: value }
+      return
+    }
+
     try {
-      await api(`/api/terms/${id}`, {
+      await api(`/api/terms/${row.id}`, {
         method: 'PATCH', body: JSON.stringify({ [field]: value }),
       })
-      onChanged()
-    } catch (e) { onError(e.message) }
+      flash(row.key)
+    } catch (e) {
+      patchRow(row.key, { error: e.message })
+      onError(e.message)
+    }
   }
 
-  const removeTerm = async (id) => {
-    try { await api(`/api/terms/${id}`, { method: 'DELETE' }); onChanged() }
-    catch (e) { onError(e.message) }
+  const removeRow = async (row) => {
+    if (row.id === null) return
+    try {
+      await api(`/api/terms/${row.id}`, { method: 'DELETE' })
+      setRows((rs) => rs.filter((r) => r.key !== row.key))
+    } catch (e) { onError(e.message) }
   }
 
   const removeService = async () => {
-    if (!confirm(`Delete ${service.name} and its ${terms.length} term(s)?`)) return
-    try { await api(`/api/services/${service.id}`, { method: 'DELETE' }); onChanged() }
-    catch (e) { onError(e.message) }
+    if (!confirm(`Delete ${service.name} and its ${saved.length} term(s)?`)) return
+    try {
+      await api(`/api/services/${service.id}`, { method: 'DELETE' })
+      onDeleted()
+    } catch (e) { onError(e.message) }
   }
 
   return (
-    <div className={`svc${isCore ? ' core' : ''}`}>
+    <div className={`svc${isCore ? ' core' : ''}${open ? ' open' : ''}`}>
       <div className="svc-head">
-        <span className="svc-name">{service.name}</span>
-        <span className="team-chip">
-          <span className="swatch"
-                style={{ background: TEAM_HEX[service.team] || '#8fa89b' }} />
-          {service.team}
-        </span>
-        <span className="count">{terms.length} term{terms.length === 1 ? '' : 's'}</span>
-        {isCore && <span className="count">— applies to every service</span>}
-        <span className="svc-head-right">
-          {!isCore && (
-            <>
-              <select
-                className="btn small"
-                value={service.team}
-                onChange={async (e) => {
-                  try {
-                    await api(`/api/services/${service.id}`, {
-                      method: 'PATCH',
-                      body: JSON.stringify({ team: e.target.value }),
-                    })
-                    onChanged()
-                  } catch (err) { onError(err.message) }
-                }}>
-                {teams.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-              <button className="btn small danger" onClick={removeService}>
-                Delete service
-              </button>
-            </>
-          )}
-        </span>
+        <button className="disclose" aria-expanded={open}
+                onClick={() => setOpen((o) => !o)}
+                title={open ? 'Collapse' : 'Expand'}>
+          <span className="caret">{open ? '▾' : '▸'}</span>
+          <span className="svc-name">{service.name}</span>
+          <span className="team-chip">
+            <span className="swatch"
+                  style={{ background: TEAM_HEX[service.team] || '#8fa89b' }} />
+            {service.team}
+          </span>
+          <span className="count">
+            {saved.length} term{saved.length === 1 ? '' : 's'}
+          </span>
+          {isCore && <span className="count">— applies to every service</span>}
+        </button>
+        {!isCore && (
+          <span className="svc-head-right">
+            <select className="btn small" value={service.team}
+                    onChange={async (e) => {
+                      try {
+                        await api(`/api/services/${service.id}`, {
+                          method: 'PATCH',
+                          body: JSON.stringify({ team: e.target.value }),
+                        })
+                        onDeleted()   // cheap re-read; no row is being edited
+                      } catch (err) { onError(err.message) }
+                    }}>
+              {teams.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <button className="btn small danger" onClick={removeService}>
+              Delete service
+            </button>
+          </span>
+        )}
       </div>
 
-      <table className="terms">
-        <colgroup>
-          <col className="c-id" /><col className="c-trigger" />
-          <col className="c-tak" /><col /><col className="c-act" />
-        </colgroup>
-        <thead>
-          <tr>
-            <th>Id</th><th>Trigger word</th><th>Tak word</th>
-            <th>Comments</th><th />
-          </tr>
-        </thead>
-        <tbody>
-          {terms.map((t) => (
-            <tr key={t.id}>
-              <td className="id">{t.id}</td>
-              <td>
-                <Cell value={t.trigger} mono
-                      onCommit={(v) => patch(t.id, 'trigger', v)} />
-              </td>
-              <td>
-                <Cell value={t.tak_word} mono placeholder="(not mapped)"
-                      onCommit={(v) => patch(t.id, 'tak_word', v)} />
-              </td>
-              <td>
-                <Cell value={t.comments} placeholder="why, or who says it"
-                      onCommit={(v) => patch(t.id, 'comments', v)} />
-              </td>
-              <td>
-                <button className="x" title="Remove"
-                        onClick={() => removeTerm(t.id)}>×</button>
-              </td>
+      {open && (
+        <table className="terms">
+          <colgroup>
+            <col className="c-id" /><col className="c-trigger" />
+            <col className="c-tak" /><col /><col className="c-act" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Id</th><th>Trigger word</th><th>Tak word</th>
+              <th>Comments</th><th />
             </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key}
+                  className={`${row.id === null ? 'newrow' : ''}${row.error ? ' bad' : ''}`}>
+                <td className="id">
+                  {row.saving ? '…' : row.id === null ? '+'
+                    : <span className={row.saved ? 'flash' : ''}>{row.id}</span>}
+                </td>
+                <td>
+                  <Cell row={row} field="trigger" mono
+                        placeholder={row.id === null ? 'what they say' : ''}
+                        onCommit={commit} catalogue={catalogue} />
+                </td>
+                <td>
+                  <Cell row={row} field="tak_word" mono
+                        placeholder={row.id === null ? 'a TAK term'
+                                                     : '(not mapped)'}
+                        onCommit={commit} catalogue={catalogue} />
+                </td>
+                <td>
+                  <Cell row={row} field="comments"
+                        placeholder={row.id === null ? '' : 'why, or who says it'}
+                        onCommit={commit} catalogue={catalogue} />
+                </td>
+                <td>
+                  {row.id !== null && (
+                    <button className="x" title="Remove"
+                            onClick={() => removeRow(row)}>×</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
+
+/* One cell. Local draft while focused, committed on blur or Enter, reverted on
+   Escape. Deliberately does NOT re-sync from props on every render - that would
+   fight the user mid-keystroke.
+
+   The Tak word column additionally predicts against the catalogue, and colours
+   itself red the moment the text is not a real term - before you leave the
+   field, because finding out on blur is finding out too late. */
+function Cell({ row, field, placeholder, mono, onCommit, catalogue }) {
+  const value = row[field] ?? ''
+  const [draft, setDraft] = useState(value)
+  // Focus is STATE, not a ref: the prediction list is rendered from it, and a
+  // ref neither triggers a re-render nor is safe to read during one.
+  const [isFocused, setIsFocused] = useState(false)
+  const focused = useRef(false)     // for the effect below, which must not re-run
+  const isTak = field === 'tak_word'
+
+  useEffect(() => { if (!focused.current) setDraft(value) }, [value])
+
+  // Valid means "does something", which a multi-word phrase can do without
+  // being a catalogue entry - "requesting backup" is not listed but both of
+  // its words match. So the client only greys a phrase it cannot verify; the
+  // server has the final say and rejects with a suggestion.
+  const known = !isTak || !catalogue || !draft.trim()
+    || catalogue.byWord.has(draft.trim().toLowerCase())
+    || draft.trim().split(/\s+/).some((w) => catalogue.byWord.has(w.toLowerCase()))
+
+  const matches = isTak && catalogue && isFocused && draft.trim()
+    ? catalogue.search(draft, 8) : []
+
+  const pick = (word) => {
+    setDraft(word)
+    onCommit(row, field, word)
+  }
+
+  return (
+    <div className={isTak ? 'takcell' : undefined}>
+      <input
+        className={`cell${mono ? ' mono' : ''}${draft !== value ? ' dirty' : ''}`
+                   + (known ? '' : ' invalid')}
+        value={draft}
+        placeholder={placeholder}
+        list={undefined}
+        autoComplete="off"
+        title={known && isTak && draft.trim()
+          ? (catalogue?.byWord.get(draft.trim().toLowerCase())?.effect || '')
+          : undefined}
+        onFocus={() => { focused.current = true; setIsFocused(true) }}
+        onChange={(e) => {
+          const v = e.target.value
+          setDraft(v)
+          if (row.id === null && field === 'trigger' && !row.saving && v.trim()) {
+            onCommit(row, 'trigger', v)
+          }
+        }}
+        onBlur={() => {
+          focused.current = false
+          setIsFocused(false)
+          // A mousedown on a suggestion fires before blur, so the pick
+          // still lands even though the list unmounts here.
+          onCommit(row, field, draft)
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            if (matches.length && !known) { e.preventDefault(); pick(matches[0].word); return }
+            e.currentTarget.blur()
+          }
+          if (e.key === 'Escape') { setDraft(value); e.currentTarget.blur() }
+        }}
+      />
+      {isTak && matches.length > 0 && !known && (
+        <ul className="predict">
+          {matches.map((m) => (
+            <li key={m.word}>
+              <button onMouseDown={(e) => { e.preventDefault(); pick(m.word) }}>
+                <span className="pw">{m.word}</span>
+                <span className={`pc ${m.category}`}>{m.category}</span>
+                <span className="pe">{m.effect}</span>
+              </button>
+            </li>
           ))}
-
-          <tr className="newrow">
-            <td className="id">+</td>
-            <td>
-              <input className="cell mono" value={newTrigger}
-                     placeholder="what they say"
-                     onChange={(e) => setNewTrigger(e.target.value)}
-                     onKeyDown={(e) => e.key === 'Enter' && addTerm()} />
-            </td>
-            <td>
-              <input className="cell mono" value={newTak}
-                     placeholder="what TAK calls it"
-                     onChange={(e) => setNewTak(e.target.value)}
-                     onKeyDown={(e) => e.key === 'Enter' && addTerm()} />
-            </td>
-            <td>
-              <input className="cell" value={newComments}
-                     placeholder="optional"
-                     onChange={(e) => setNewComments(e.target.value)}
-                     onKeyDown={(e) => e.key === 'Enter' && addTerm()} />
-            </td>
-            <td>
-              <button className="btn small" onClick={addTerm}
-                      disabled={!newTrigger.trim()}>Add</button>
-            </td>
-          </tr>
-
-          {terms.length === 0 && (
-            <tr><td colSpan={5} className="empty">
-              No terms yet — type one in the row above.
-            </td></tr>
-          )}
-        </tbody>
-      </table>
+        </ul>
+      )}
     </div>
   )
 }
@@ -195,25 +321,56 @@ function ServiceTable({ service, terms, teams, onChanged, onError }) {
 export default function Vocabulary() {
   const [services, setServices] = useState([])
   const [teams, setTeams] = useState([])
-  const [terms, setTerms] = useState([])
+  const [termsByService, setTermsByService] = useState({})
+  const [counts, setCounts] = useState({})
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [newService, setNewService] = useState('')
   const [newTeam, setNewTeam] = useState('Blue')
+  const [openAll, setOpenAll] = useState(null)
+  const [epoch, setEpoch] = useState(0)
 
-  const reload = useCallback(async () => {
+  const [catalogue, setCatalogue] = useState(null)
+
+  // The whole catalogue once, up front. It is ~150 entries, so prediction and
+  // validation happen locally - no round trip on a keystroke, and the field
+  // can go red the moment the word stops being real rather than on blur.
+  useEffect(() => {
+    api('/api/takwords').then((d) => {
+      const byWord = new Map(d.words.map((w) => [w.word.toLowerCase(), w]))
+      setCatalogue({
+        all: d.words,
+        byWord,
+        ignore: d.ignore,
+        search: (q, limit = 8) => {
+          const s = q.trim().toLowerCase()
+          if (!s) return []
+          const starts = d.words.filter((w) => w.word.toLowerCase().startsWith(s))
+          const rest = d.words.filter((w) => w.word.toLowerCase().includes(s)
+                                          && !w.word.toLowerCase().startsWith(s))
+          return [...starts, ...rest].slice(0, limit)
+        },
+      })
+    }).catch(() => setCatalogue(null))
+  }, [])
+
+  const load = useCallback(async () => {
     try {
-      const [s, t] = await Promise.all([
-        api('/api/services'), api('/api/terms'),
-      ])
-      setServices(s.services); setTeams(s.teams); setTerms(t.terms)
+      const [s, t] = await Promise.all([api('/api/services'), api('/api/terms')])
+      const grouped = {}
+      for (const term of t.terms) {
+        (grouped[term.service_id] ||= []).push(term)
+      }
+      setServices(s.services); setTeams(s.teams); setTermsByService(grouped)
+      setCounts(Object.fromEntries(
+        s.services.map((x) => [x.id, (grouped[x.id] || []).length])))
       setError('')
     } catch (e) {
       setError(`Cannot reach the API — is web/app.py running? (${e.message})`)
     } finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { reload() }, [reload])
+  useEffect(() => { load() }, [load, epoch])
 
   const addService = async () => {
     if (!newService.trim()) return
@@ -223,13 +380,25 @@ export default function Vocabulary() {
         body: JSON.stringify({ name: newService, team: newTeam }),
       })
       setNewService('')
-      reload()
+      setEpoch((e) => e + 1)
     } catch (e) { setError(e.message) }
   }
 
+  const onCount = useCallback(
+    (id, n) => setCounts((c) => (c[id] === n ? c : { ...c, [id]: n })), [])
+
   const core = services.filter((s) => s.is_core)
   const rest = services.filter((s) => !s.is_core)
-  const termsFor = (id) => terms.filter((t) => t.service_id === id)
+  const total = Object.values(counts).reduce((a, b) => a + b, 0)
+
+  const table = (s) => (
+    // epoch in the key forces a clean remount after a service add/delete,
+    // which is the only time discarding local row state is correct.
+    <ServiceTable key={`${s.id}-${epoch}`} service={s} teams={teams}
+                  initialTerms={termsByService[s.id] || []}
+                  onError={setError} onDeleted={() => setEpoch((e) => e + 1)}
+                  openAll={openAll} onCount={onCount} catalogue={catalogue} />
+  )
 
   return (
     <div className="page-inner">
@@ -243,22 +412,31 @@ export default function Vocabulary() {
         can mean different things to different teams — <code>fire</code> to the
         firefighters is an incident, <code>fire</code> to SAS is weapons free.
         Core terms apply to everyone, and a service term of the same name
-        overrides the core one. Edits save when you leave the field or press
-        Enter; Escape reverts.
+        overrides the core one. <strong>Just type</strong> — a row is created as
+        soon as you start a trigger word, and every field saves when you leave
+        it. Escape reverts.
       </p>
 
       {error && <div className="banner">{error}</div>}
       {loading && <p className="note">Loading…</p>}
 
-      {core.map((s) => (
-        <ServiceTable key={s.id} service={s} terms={termsFor(s.id)}
-                      teams={teams} onChanged={reload} onError={setError} />
-      ))}
+      {!loading && (
+        <div className="listbar">
+          <span className="count">
+            {services.length} dictionar{services.length === 1 ? 'y' : 'ies'} ·{' '}
+            {total} term{total === 1 ? '' : 's'}
+          </span>
+          <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button className="btn small"
+                    onClick={() => setOpenAll({ value: true })}>Expand all</button>
+            <button className="btn small"
+                    onClick={() => setOpenAll({ value: false })}>Collapse all</button>
+          </span>
+        </div>
+      )}
 
-      {rest.map((s) => (
-        <ServiceTable key={s.id} service={s} terms={termsFor(s.id)}
-                      teams={teams} onChanged={reload} onError={setError} />
-      ))}
+      {core.map(table)}
+      {rest.map(table)}
 
       <div className="addsvc">
         <strong style={{ fontSize: '0.9rem' }}>Add service</strong>

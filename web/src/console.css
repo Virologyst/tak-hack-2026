@@ -101,22 +101,58 @@ p.page-sub { margin: 0 0 22px; color: var(--mut); max-width: 74ch; }
 
 /* ---------- vocabulary tables ---------- */
 
+.listbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
 .svc {
   border: 1px solid var(--line);
   border-radius: 4px;
-  margin-bottom: 18px;
+  /* Tight when collapsed so the whole set reads as a list, roomier once open. */
+  margin-bottom: 6px;
   background: var(--panel);
   overflow: hidden;
 }
+.svc.open { margin-bottom: 18px; }
 .svc.core { border-color: #35503f; }
 
 .svc-head {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--line);
+  padding: 4px 14px 4px 6px;
   background: #0f1814;
+}
+.svc.open .svc-head { border-bottom: 1px solid var(--line); }
+
+/* The whole name/count block is the hit target - a bare caret is a tiny thing
+   to aim at, and this is used at speed. */
+.disclose {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.disclose:hover { background: #16231d; }
+.disclose:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
+
+.caret {
+  color: var(--acc);
+  font-size: 11px;
+  width: 12px;
+  flex: none;
 }
 
 .svc-name {
@@ -232,6 +268,95 @@ input.cell.dirty { border-color: var(--warn); }
 .x:hover { color: var(--hot); background: #1d1513; }
 
 .newrow td { background: #0c1512; }
+
+/* ---------- tak word prediction ---------- */
+
+.takcell { position: relative; }
+
+/* Red the instant the text stops being a real term - not on blur, because
+   finding out after you have moved on is finding out too late. */
+input.cell.invalid {
+  border-color: var(--hot);
+  color: var(--hot);
+}
+
+.predict {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 2px);
+  left: 0;
+  min-width: 380px;
+  max-width: 520px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 3px;
+  list-style: none;
+  background: #0b120f;
+  border: 1px solid var(--acc);
+  border-radius: 3px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+}
+.predict li { margin: 0; }
+.predict button {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  padding: 6px 9px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.predict button:hover, .predict button:focus-visible {
+  background: #16231d;
+  outline: none;
+}
+.predict .pw {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.predict .pc {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 1px 5px;
+  color: var(--mut);
+  flex: none;
+}
+.predict .pc.intent    { color: var(--acc);  border-color: #2c6a42; }
+.predict .pc.agency    { color: var(--blue); border-color: #2f4d6e; }
+.predict .pc.priority  { color: var(--hot);  border-color: #6b3733; }
+.predict .pc.casualty  { color: var(--warn); border-color: #6a5620; }
+.predict .pc.control   { color: var(--warn); border-color: #6a5620; }
+.predict .pe {
+  color: var(--mut);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+tr.bad td { background: #1d1513; }
+
+/* A brief green pulse on the id when a field saves. The only save feedback
+   there is, since there is no save button to give any - it has to be visible
+   without being something you must look at. */
+@keyframes savedflash {
+  from { color: var(--acc); }
+  to   { color: var(--mut); }
+}
+.flash { animation: savedflash 900ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .flash { animation: none; color: var(--acc); }
+}
 
 .addsvc {
   display: flex;

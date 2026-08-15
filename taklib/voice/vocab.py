@@ -38,6 +38,11 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 #: everywhere; stored as the sentinel row id=1 on the database side.
 CORE = "CORE"
 
+#: A tak word of "(ignore)" deletes the trigger instead of replacing it. See
+#: `takwords.IGNORE` - it exists for the SAS "fire" case, where the word must
+#: not survive into the text for the agency matcher to find.
+IGNORE = "(ignore)"
+
 
 class Term:
     """One row of a vocabulary table: what they say, and what we call it."""
@@ -234,6 +239,16 @@ class Vocabulary:
                 continue                        # shouldn't happen; be safe
             term, shadows = entry
             out.append(text[last:m.start()])
+            if term.tak_word == IGNORE:
+                # Drop the word entirely, and the space it leaves behind, so
+                # "fire at gate four" becomes "at gate four" rather than
+                # "  at gate four".
+                last = m.end()
+                while last < len(text) and text[last] == " ":
+                    last += 1
+                hits.append(Hit(m.start(), m.end(), matched, "", term.service,
+                                term.id, shadows))
+                continue
             out.append(_match_case(matched, term.tak_word))
             last = m.end()
             hits.append(Hit(m.start(), m.end(), matched, term.tak_word,

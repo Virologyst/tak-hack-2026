@@ -61,8 +61,13 @@ INTENT_PATTERNS = (
     ("on_scene",        r"\b(on scene|onscene|arrived|at location|we'?re here|in position)\b"),
     ("responding",      r"\b(responding|en route|enroute|on our way|proceeding|attending)\b"),
     ("request_support", r"\b(request(ing)?|need|require|send|backup|assistance|support)\b"),
-    ("casualty_report", r"\b(patient|casualt|injur|victim|wounded|cpr|unconscious)\b"),
-    ("sighting",        r"\b(sighted|observ|spotted|visual on|contact with)\b"),
+    # The stems here MUST carry \w*, not a bare \b. `casualt` inside \b...\b
+    # only matches the literal string "casualt", which nobody says - so
+    # "casualties" and "injured" fell through to intent=other while looking
+    # perfectly well handled. Found by takwords.verify(), which is exactly the
+    # job it exists to do.
+    ("casualty_report", r"\b(patients?|casualt\w*|injur\w*|victims?|wounded|cpr|unconscious)\b"),
+    ("sighting",        r"\b(sighted|observ\w*|spotted|visual on|contact with)\b"),
 )
 
 PRIORITY_PATTERNS = (
